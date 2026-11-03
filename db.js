@@ -12,7 +12,8 @@ const COL = {
   orders:    db.collection('orders'),     // заказы
   customers: db.collection('customers'),  // клиенты
   expenses:  db.collection('expenses'),   // расходы бизнеса
-  moves:     db.collection('stock_moves') // приход / списание товара
+  moves:     db.collection('stock_moves'),// приход / списание товара
+  materials: db.collection('materials')   // сырьё (земля, горшки, удобрения, черенки, семена)
 };
 
 const DB = {
@@ -176,6 +177,56 @@ const DB = {
   },
   async deleteExpense(docId) {
     await COL.expenses.doc(docId).delete();
+  },
+
+  // ---------- СЫРЬЁ (материалы) ----------
+  async getMaterials() {
+    const snap = await COL.materials.get();
+    return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+  },
+  watchMaterials(cb) {
+    return COL.materials.onSnapshot(snap => cb(snap.docs.map(d => ({ ...d.data(), _docId: d.id }))));
+  },
+  // Создание/редактирование сырья. _docId есть → правим, нет → создаём.
+  async saveMaterial(m) {
+    const data = { ...m }; delete data._docId;
+    if (m._docId) { await COL.materials.doc(m._docId).set(data, { merge: true }); return m._docId; }
+    if (data.stock == null) data.stock = 0;
+    if (data.avgCost == null) data.avgCost = 0;
+    const ref = await COL.materials.add(data);
+    return ref.id;
+  },
+  async deleteMaterial(docId) {
+    await COL.materials.doc(String(docId)).delete();
+  },
+  // Приход сырья: пополняем остаток, пересчитываем среднюю цену
+  // (сумма закупа ÷ количество, усредняя с уже имеющимся) и пишем расход.
+  async receiveMaterial(docId, qty, totalCost, note) {
+    const ref = COL.materials.doc(String(docId));
+    const pre = await ref.get();
+    if (!pre.exists) throw new Error('Сырьё не найдено в базе');
+    const m0 = pre.data();
+    const addQty = Number(qty) || 0;
+    const addCost = Number(totalCost) || 0;
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      const m = snap.data();
+      const have = m.stock || 0, avg = m.avgCost || 0;
+      const newStock = have + addQty;
+      const newAvg = newStock > 0 ? (have * avg + addCost) / newStock : 0;
+      tx.update(ref, { stock: newStock, avgCost: Math.round(newAvg) });
+    });
+    const catByKind = { soil:'Земля', fertilizer:'Удобрения', pot:'Горшки', cutting:'Покупной черенок', seed:'Покупные семена' };
+    if (addCost > 0) {
+      await COL.expenses.add({
+        cat: catByKind[m0.kind] || 'Закуп сырья',
+        sum: addCost,
+        date: new Date().toISOString().slice(0, 10),
+        note: (note ? note + ' · ' : 'Приход · ') + (m0.name || ''),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    return docId;
   },
 
   // ---------- ПРИХОД / СПИСАНИЕ ТОВАРА ----------

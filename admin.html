@@ -134,6 +134,7 @@
 
 <div class="tabs">
   <button class="tab active" data-t="stock" onclick="showTab('stock')">Склад</button>
+  <button class="tab" data-t="materials" onclick="showTab('materials')">Сырьё</button>
   <button class="tab" data-t="orders" onclick="showTab('orders')">Заказы</button>
   <button class="tab" data-t="customers" onclick="showTab('customers')">Клиенты</button>
   <button class="tab" data-t="moves" onclick="showTab('moves')">Приход / Списание</button>
@@ -143,6 +144,7 @@
 
 <div class="wrap">
   <div id="pane-stock"></div>
+  <div id="pane-materials" style="display:none"></div>
   <div id="pane-orders" style="display:none"></div>
   <div id="pane-customers" style="display:none"></div>
   <div id="pane-moves" style="display:none"></div>
@@ -217,10 +219,33 @@
     <button class="btn green" onclick="runImport()">Загрузить в базу</button></div>
 </div></div>
 
+<div class="ov" id="ovMat"><div class="box">
+  <h2 id="matTitle">Новое сырьё</h2>
+  <div class="f"><label>Название</label><input type="text" id="matName" placeholder="Земля универсальная / Горшок 1л"></div>
+  <div class="f"><label>Вид сырья</label><select id="matKind" onchange="matUnitHint()"></select>
+    <div class="hint" id="matUnitHint">Единица измерения: —</div></div>
+  <div class="note">Остаток и цену за единицу задаёт «Приход сырья» — здесь только название и вид.</div>
+  <div class="acts"><button class="btn" onclick="closeOv('ovMat')">Отмена</button>
+    <button class="btn primary" onclick="saveMat()">Сохранить</button></div>
+</div></div>
+
+<div class="ov" id="ovMatIn"><div class="box">
+  <h2>Приход сырья</h2>
+  <div class="f"><label>Сырьё</label><select id="miMat"></select></div>
+  <div class="f2">
+    <div class="f"><label>Количество (<span id="miUnit">—</span>)</label><input type="number" id="miQty" min="0" step="any"></div>
+    <div class="f"><label>Сумма закупа, тг</label><input type="number" id="miCost" min="0" placeholder="0"></div>
+  </div>
+  <div class="hint">Цена за единицу посчитается сама: сумма ÷ количество (с усреднением по остатку). Сумма закупа уйдёт в «Расходы».</div>
+  <div class="f"><label>Комментарий</label><input type="text" id="miNote" placeholder="Поставщик / партия"></div>
+  <div class="acts"><button class="btn" onclick="closeOv('ovMatIn')">Отмена</button>
+    <button class="btn primary" onclick="saveMatIn()">Оприходовать</button></div>
+</div></div>
+
 <script src="firebase-config.js"></script>
 <script src="db.js"></script>
 <script>
-let PRODUCTS = [], ORDERS = [], CUSTOMERS = [], EXPENSES = [], MOVES = [];
+let PRODUCTS = [], ORDERS = [], CUSTOMERS = [], EXPENSES = [], MOVES = [], MATERIALS = [];
 let curTab = 'stock', grpFilter = 'all', editId = null, moveType = 'income';
 const VIDS = ['Ампельные','Каскадные','Кустовые','Межвидовые','Многолетние'];
 const SZ = { a1:'Маленький', a2:'Средний', a3:'Большой' };
@@ -262,8 +287,8 @@ function boot(){
 
 async function reloadAll(){
   try{
-    const res = await Promise.all([DB.getOrders(), DB.getCustomers(), DB.getExpenses(), DB.getMoves()]);
-    ORDERS=res[0]; CUSTOMERS=res[1]; EXPENSES=res[2]; MOVES=res[3];
+    const res = await Promise.all([DB.getOrders(), DB.getCustomers(), DB.getExpenses(), DB.getMoves(), DB.getMaterials()]);
+    ORDERS=res[0]; CUSTOMERS=res[1]; EXPENSES=res[2]; MOVES=res[3]; MATERIALS=res[4];
     renderTab();
   }catch(e){ setStatus('Ошибка базы: '+e.message, true); }
 }
@@ -271,13 +296,13 @@ async function reloadAll(){
 function showTab(t){
   curTab=t;
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
-  ['stock','orders','customers','moves','expenses','finance'].forEach(x=>{
+  ['stock','materials','orders','customers','moves','expenses','finance'].forEach(x=>{
     document.getElementById('pane-'+x).style.display = x===t?'block':'none';
   });
   renderTab();
 }
 function renderTab(){
-  const map={stock:renderStock, orders:renderOrders, customers:renderCustomers,
+  const map={stock:renderStock, materials:renderMaterials, orders:renderOrders, customers:renderCustomers,
     moves:renderMoves, expenses:renderExpenses, finance:renderFinance};
   map[curTab]();
 }
@@ -285,11 +310,107 @@ function renderTab(){
 const fmt = n => (n||0).toLocaleString('ru-RU') + ' тг';
 const dt = ts => ts && ts.toDate ? ts.toDate().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '-';
 
+/* ================= СЫРЬЁ (материалы) ================= */
+const MAT_KINDS = [
+  {k:'soil',       name:'Земля',     unit:'л'},
+  {k:'fertilizer', name:'Удобрение', unit:'кг'},
+  {k:'pot',        name:'Горшок',    unit:'шт'},
+  {k:'cutting',    name:'Черенок',   unit:'шт'},
+  {k:'seed',       name:'Семена',    unit:'упак'}
+];
+const MAT_UNIT  = k => (MAT_KINDS.find(x=>x.k===k)||{}).unit || '';
+const MAT_KNAME = k => (MAT_KINDS.find(x=>x.k===k)||{}).name || k;
+let matEditId = null;
+
+function renderMaterials(){
+  const totalVal = MATERIALS.reduce((n,m)=>n+(m.stock||0)*(m.avgCost||0),0);
+  document.getElementById('pane-materials').innerHTML=
+    '<div class="stats">'+
+      '<div class="stat"><div class="num">'+MATERIALS.length+'</div><div class="lbl">Видов сырья</div></div>'+
+      '<div class="stat good"><div class="num">'+fmt(totalVal)+'</div><div class="lbl">Стоимость сырья на складе</div></div>'+
+    '</div>'+
+    '<div class="bar">'+
+      '<button class="btn primary" onclick="openMat()">+ Новое сырьё</button>'+
+      '<button class="btn green" onclick="openMatIn()">Приход сырья</button>'+
+    '</div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Название</th><th>Вид</th><th>Остаток</th><th>Цена за ед.</th><th>Стоимость</th><th></th></tr></thead><tbody>'+
+    (MATERIALS.length?MATERIALS.map(function(m){
+      const low=(m.stock||0)<=0;
+      return '<tr><td><b>'+(m.name||'-')+'</b></td>'+
+        '<td>'+MAT_KNAME(m.kind)+'</td>'+
+        '<td><b'+(low?' style="color:var(--red)"':'')+'>'+(m.stock||0)+'</b> '+MAT_UNIT(m.kind)+'</td>'+
+        '<td>'+fmt(m.avgCost||0)+'</td>'+
+        '<td>'+fmt((m.stock||0)*(m.avgCost||0))+'</td>'+
+        '<td><div class="row-flex">'+
+          '<button class="btn small green" onclick="openMatIn(\''+m._docId+'\')">Приход</button>'+
+          '<button class="icon-btn" onclick="openMat(\''+m._docId+'\')">e</button>'+
+          '<button class="icon-btn" onclick="delMat(\''+m._docId+'\')">x</button>'+
+        '</div></td></tr>';
+    }).join(''):'<tr><td colspan="6" class="empty">Сырья пока нет. Нажми «+ Новое сырьё».</td></tr>')+
+    '</tbody></table></div>';
+}
+
+function fillMatKinds(sel, val){
+  sel.innerHTML = MAT_KINDS.map(x=>'<option value="'+x.k+'"'+(x.k===val?' selected':'')+'>'+x.name+' ('+x.unit+')</option>').join('');
+}
+function matUnitHint(){
+  document.getElementById('matUnitHint').textContent='Единица измерения: '+MAT_UNIT(document.getElementById('matKind').value);
+}
+function openMat(docId){
+  matEditId = docId || null;
+  const m = docId ? MATERIALS.find(x=>x._docId===docId) : null;
+  document.getElementById('matTitle').textContent = m?'Редактировать сырьё':'Новое сырьё';
+  document.getElementById('matName').value = m?(m.name||''):'';
+  fillMatKinds(document.getElementById('matKind'), m?m.kind:'soil');
+  matUnitHint();
+  document.getElementById('ovMat').classList.add('open');
+}
+async function saveMat(){
+  const name=document.getElementById('matName').value.trim();
+  const kind=document.getElementById('matKind').value;
+  if(!name){ alert('Введите название'); return; }
+  const data={ name:name, kind:kind };
+  if(matEditId) data._docId=matEditId;
+  try{ await DB.saveMaterial(data); closeOv('ovMat'); await reloadAll(); setStatus('Сырьё сохранено'); }
+  catch(e){ setStatus('Ошибка: '+e.message, true); alert('Ошибка: '+e.message); }
+}
+async function delMat(docId){
+  const m=MATERIALS.find(x=>x._docId===docId);
+  if(!confirm('Удалить «'+(m?m.name:'')+'» из сырья?')) return;
+  try{ await DB.deleteMaterial(docId); await reloadAll(); setStatus('Сырьё удалено'); }
+  catch(e){ setStatus('Ошибка: '+e.message, true); }
+}
+function openMatIn(docId){
+  if(!MATERIALS.length){ alert('Сначала добавь хотя бы одно сырьё'); return; }
+  const sel=document.getElementById('miMat');
+  sel.innerHTML=MATERIALS.map(m=>'<option value="'+m._docId+'">'+m.name+' ('+MAT_KNAME(m.kind)+')</option>').join('');
+  if(docId) sel.value=docId;
+  sel.onchange=miUnitHint; miUnitHint();
+  document.getElementById('miQty').value='';
+  document.getElementById('miCost').value='';
+  document.getElementById('miNote').value='';
+  document.getElementById('ovMatIn').classList.add('open');
+}
+function miUnitHint(){
+  const m=MATERIALS.find(x=>x._docId===document.getElementById('miMat').value);
+  document.getElementById('miUnit').textContent=m?MAT_UNIT(m.kind):'—';
+}
+async function saveMatIn(){
+  const id=document.getElementById('miMat').value;
+  const qty=parseFloat(document.getElementById('miQty').value)||0;
+  const cost=parseInt(document.getElementById('miCost').value)||0;
+  const note=document.getElementById('miNote').value.trim();
+  if(qty<=0){ alert('Укажите количество'); return; }
+  try{ await DB.receiveMaterial(id, qty, cost, note); closeOv('ovMatIn'); await reloadAll(); setStatus('Приход оприходован, остаток пополнен, сумма ушла в расходы'); }
+  catch(e){ setStatus('Ошибка: '+e.message, true); alert('Ошибка: '+e.message); }
+}
+/* ============== конец блока «Сырьё» ============== */
+
 function renderStock(){
   const groups=[...new Set(PRODUCTS.map(p=>p.group))].filter(Boolean).sort();
   const total=PRODUCTS.length, active=PRODUCTS.filter(p=>p.active!==false).length;
   const out=PRODUCTS.filter(p=>{const s=p.stock||{};return !(s.a1>0||s.a2>0||s.a3>0)}).length;
-  const units=PRODUCTS.reduce((n,p)=>{const s=p.stock||{};return n+(s.a1||0)+(s.a2||0)+(s.a3||0)},0);
+  const stockValue=PRODUCTS.reduce((n,p)=>{const s=p.stock||{};return n+['a1','a2','a3'].reduce((m,k)=>m+(s[k]||0)*((p.price&&p.price[k])||0),0)},0);
 
   let list=PRODUCTS.filter(p=>grpFilter==='all'||p.group===grpFilter);
   const _sEl=document.getElementById('sSearch');
@@ -303,7 +424,7 @@ function renderStock(){
       '<div class="stat"><div class="num">'+total+'</div><div class="lbl">Позиций</div></div>'+
       '<div class="stat good"><div class="num">'+active+'</div><div class="lbl">В продаже</div></div>'+
       '<div class="stat warn"><div class="num">'+out+'</div><div class="lbl">Нет в наличии</div></div>'+
-      '<div class="stat"><div class="num">'+units+'</div><div class="lbl">Всего штук на складе</div></div>'+
+      '<div class="stat"><div class="num">'+fmt(stockValue)+'</div><div class="lbl">Стоимость склада</div></div>'+
     '</div>'+
     '<div class="bar">'+
       '<input type="text" id="sSearch" placeholder="Поиск по названию..." value="'+q+'" oninput="renderStock()">'+
@@ -329,9 +450,6 @@ function renderStock(){
         '<button class="icon-btn" onclick="delProd('+p.id+')">x</button></div></td></tr>';
     }).join(''):'<tr><td colspan="7" class="empty">Пусто. Если база новая — нажми «Загрузить товары из JSON» вверху.</td></tr>')+
     '</tbody></table></div>';
-
-  // Возвращаем фокус в поле поиска после перерисовки, чтобы можно было
-  // печатать дальше (раньше курсор пропадал после первой буквы).
   if(_sFocused){
     const el=document.getElementById('sSearch');
     if(el){ el.focus(); try{ el.setSelectionRange(_sCaret, _sCaret); }catch(e){} }
