@@ -198,11 +198,27 @@
 <div class="ov" id="ovExp"><div class="box">
   <h2>Новый расход</h2>
   <div class="f2">
-    <div class="f"><label>Категория</label><select id="eCat">
-      <option>Закуп товара</option><option>Аренда</option><option>Зарплата</option><option>Транспорт</option>
-      <option>Реклама</option><option>Упаковка</option><option>Коммунальные</option><option>Прочее</option>
+    <div class="f"><label>Категория</label><select id="eCat" onchange="expCatChange()">
+      <optgroup label="Закуп сырья (пополнит склад сырья)">
+        <option value="Земля">Земля</option>
+        <option value="Удобрения">Удобрения</option>
+        <option value="Горшки">Горшки</option>
+        <option value="Покупной черенок">Покупной черенок</option>
+        <option value="Покупные семена">Покупные семена</option>
+      </optgroup>
+      <optgroup label="Прочие расходы">
+        <option>Закуп товара</option><option>Аренда</option><option>Зарплата</option><option>Транспорт</option>
+        <option>Реклама</option><option>Упаковка</option><option>Коммунальные</option><option>Прочее</option>
+      </optgroup>
     </select></div>
     <div class="f"><label>Сумма, тг</label><input type="number" id="eSum"></div>
+  </div>
+  <div id="eMatBox">
+    <div class="f2">
+      <div class="f"><label>Название сырья</label><input type="text" id="eMatName" placeholder="Земля универсальная / Горшок 1л"></div>
+      <div class="f"><label>Количество (<span id="eMatUnit">—</span>)</label><input type="number" id="eMatQty" min="0" step="any"></div>
+    </div>
+    <div class="hint">Это сырьё добавится в остаток на складе сырья. Цена за единицу = сумма ÷ количество.</div>
   </div>
   <div class="f"><label>Дата</label><input type="date" id="eDate"></div>
   <div class="f"><label>Описание</label><input type="text" id="eNote" placeholder="За что потрачено"></div>
@@ -329,11 +345,8 @@ function renderMaterials(){
       '<div class="stat"><div class="num">'+MATERIALS.length+'</div><div class="lbl">Видов сырья</div></div>'+
       '<div class="stat good"><div class="num">'+fmt(totalVal)+'</div><div class="lbl">Стоимость сырья на складе</div></div>'+
     '</div>'+
-    '<div class="bar">'+
-      '<button class="btn primary" onclick="openMat()">+ Новое сырьё</button>'+
-      '<button class="btn green" onclick="openMatIn()">Приход сырья</button>'+
-    '</div>'+
-    '<div class="tbl-wrap"><table><thead><tr><th>Название</th><th>Вид</th><th>Остаток</th><th>Цена за ед.</th><th>Стоимость</th><th></th></tr></thead><tbody>'+
+    '<div class="note">Сырьё появляется здесь само, когда ты записываешь закуп во вкладке «Расходы» (категории: земля, удобрения, горшки, черенки, семена).</div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Название</th><th>Вид</th><th>Доступно</th><th>Цена за ед.</th><th>Стоимость</th><th></th></tr></thead><tbody>'+
     (MATERIALS.length?MATERIALS.map(function(m){
       const low=(m.stock||0)<=0;
       return '<tr><td><b>'+(m.name||'-')+'</b></td>'+
@@ -341,11 +354,7 @@ function renderMaterials(){
         '<td><b'+(low?' style="color:var(--red)"':'')+'>'+(m.stock||0)+'</b> '+MAT_UNIT(m.kind)+'</td>'+
         '<td>'+fmt(m.avgCost||0)+'</td>'+
         '<td>'+fmt((m.stock||0)*(m.avgCost||0))+'</td>'+
-        '<td><div class="row-flex">'+
-          '<button class="btn small green" onclick="openMatIn(\''+m._docId+'\')">Приход</button>'+
-          '<button class="icon-btn" onclick="openMat(\''+m._docId+'\')">e</button>'+
-          '<button class="icon-btn" onclick="delMat(\''+m._docId+'\')">x</button>'+
-        '</div></td></tr>';
+        '<td><button class="icon-btn" title="Удалить (для исправлений)" onclick="delMat(\''+m._docId+'\')">x</button></td></tr>';
     }).join(''):'<tr><td colspan="6" class="empty">Сырья пока нет. Нажми «+ Новое сырьё».</td></tr>')+
     '</tbody></table></div>';
 }
@@ -721,16 +730,38 @@ async function saveMove(){
   }catch(e){ alert('Ошибка: '+e.message); }
 }
 
+const EXP_MAT = { 'Земля':'soil', 'Удобрения':'fertilizer', 'Горшки':'pot', 'Покупной черенок':'cutting', 'Покупные семена':'seed' };
+function expCatChange(){
+  const kind=EXP_MAT[document.getElementById('eCat').value];
+  document.getElementById('eMatBox').style.display = kind ? 'block' : 'none';
+  if(kind) document.getElementById('eMatUnit').textContent = MAT_UNIT(kind);
+}
 function openExp(){
   document.getElementById('eSum').value=''; document.getElementById('eNote').value='';
+  document.getElementById('eMatName').value=''; document.getElementById('eMatQty').value='';
   document.getElementById('eDate').value=new Date().toISOString().slice(0,10);
+  expCatChange();
   document.getElementById('ovExp').classList.add('open');
 }
 async function saveExp(){
+  const cat=document.getElementById('eCat').value;
   const sum=parseInt(document.getElementById('eSum').value)||0; if(sum<=0){alert('Укажите сумму');return;}
-  await DB.addExpense({cat:document.getElementById('eCat').value,sum:sum,
-    date:document.getElementById('eDate').value,note:document.getElementById('eNote').value.trim()});
-  closeOv('ovExp'); await reloadAll(); setStatus('Расход записан');
+  const date=document.getElementById('eDate').value;
+  const note=document.getElementById('eNote').value.trim();
+  try{
+    if(EXP_MAT[cat]){
+      const name=document.getElementById('eMatName').value.trim();
+      const qty=parseFloat(document.getElementById('eMatQty').value)||0;
+      if(!name){ alert('Введите название сырья'); return; }
+      if(qty<=0){ alert('Укажите количество'); return; }
+      await DB.purchaseMaterial({ name, kind:EXP_MAT[cat], qty, cost:sum, date, note });
+      setStatus('Закуп записан — сырьё на складе пополнено');
+    } else {
+      await DB.addExpense({ cat, sum, date, note });
+      setStatus('Расход записан');
+    }
+    closeOv('ovExp'); await reloadAll();
+  }catch(e){ setStatus('Ошибка: '+e.message, true); alert('Ошибка: '+e.message); }
 }
 
 function openImport(){ document.getElementById('impLog').textContent=''; document.getElementById('ovImp').classList.add('open'); }

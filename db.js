@@ -180,6 +180,37 @@ const DB = {
   },
 
   // ---------- СЫРЬЁ (материалы) ----------
+  // Закуп сырья из вкладки «Расходы»: находим сырьё по названию+виду
+  // (или создаём новое), пополняем остаток, усредняем цену и пишем расход.
+  async purchaseMaterial({ name, kind, qty, cost, date, note }) {
+    const addQty = Number(qty) || 0;
+    const addCost = Number(cost) || 0;
+    const found = await COL.materials.where('name', '==', name).where('kind', '==', kind).limit(1).get();
+    if (!found.empty) {
+      const ref = found.docs[0].ref;
+      await db.runTransaction(async tx => {
+        const d = (await tx.get(ref)).data();
+        const have = d.stock || 0, avg = d.avgCost || 0;
+        const newStock = have + addQty;
+        const newAvg = newStock > 0 ? (have * avg + addCost) / newStock : 0;
+        tx.update(ref, { stock: newStock, avgCost: Math.round(newAvg) });
+      });
+    } else {
+      await COL.materials.add({
+        name, kind,
+        stock: addQty,
+        avgCost: addQty > 0 ? Math.round(addCost / addQty) : 0
+      });
+    }
+    const catByKind = { soil:'Земля', fertilizer:'Удобрения', pot:'Горшки', cutting:'Покупной черенок', seed:'Покупные семена' };
+    await COL.expenses.add({
+      cat: catByKind[kind] || 'Закуп сырья',
+      sum: addCost,
+      date: date || new Date().toISOString().slice(0, 10),
+      note: note || name,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  },
   async getMaterials() {
     const snap = await COL.materials.get();
     return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
