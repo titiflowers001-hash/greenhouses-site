@@ -329,6 +329,9 @@ function renderStock(){
         '<button class="icon-btn" onclick="delProd('+p.id+')">x</button></div></td></tr>';
     }).join(''):'<tr><td colspan="7" class="empty">Пусто. Если база новая — нажми «Загрузить товары из JSON» вверху.</td></tr>')+
     '</tbody></table></div>';
+
+  // Возвращаем фокус в поле поиска после перерисовки, чтобы можно было
+  // печатать дальше (раньше курсор пропадал после первой буквы).
   if(_sFocused){
     const el=document.getElementById('sSearch');
     if(el){ el.focus(); try{ el.setSelectionRange(_sCaret, _sCaret); }catch(e){} }
