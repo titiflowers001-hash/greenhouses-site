@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Green MAMA — Каталог растений</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="db.js"></script>
+<style>
+  :root {
+    --bg: #f9f7f4;
+    --white: #fffef9;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --accent-red: #fb4e04;
+    --accent-green: #bbd004;
+    --accent-dark-green: #7a8a00;
+    --border: #e0e0e0;
+    --light-green: #f8fbe6;
+  }
+  
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Montserrat',sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+
+  header {
+    background:var(--white); border-bottom:3px solid var(--accent-red); position:sticky; top:0; z-index:100;
+    box-shadow: 0 2px 10px rgba(0,0,0,.05);
+  }
+  
+  .header-inner {
+    max-width:1280px; margin:0 auto; display:flex; align-items:center; justify-content:space-between;
+    padding:0 2rem; height:80px;
+  }
+  
+  .logo { display:flex; align-items:center; gap:0; height:65px; }
+  .logo img { height:100%; width:auto; object-fit:contain; }
+  
+  nav { display:flex; gap:2.5rem; align-items:center; }
+  nav a {
+    font-size:.8rem; font-weight:600; letter-spacing:.12em; text-transform:uppercase;
+    text-decoration:none; color:var(--muted); transition:color .2s; cursor:pointer; position:relative;
+  }
+  nav a:hover, nav a.active { color:var(--accent-red); }
+  nav a.active::after { content:''; position:absolute; bottom:-8px; left:0; right:0; height:2px; background:var(--accent-red); }
+  
+  .cart-btn {
+    display:flex; align-items:center; gap:.6rem; background:var(--accent-red); color:#fff;
+    border:none; cursor:pointer; padding:.6rem 1.4rem; border-radius:3px;
+    font-family:'Montserrat',sans-serif; font-size:.8rem; font-weight:700; letter-spacing:.08em;
+    text-transform:uppercase; transition:background .2s;
+  }
+  .cart-btn:hover { background:#d13e00; }
+  .cart-count { background:#fff; color:var(--accent-red); border-radius:50%; width:22px; height:22px;
+    display:flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:700; }
+
+  .hero {
+    background:linear-gradient(135deg, var(--accent-red) 0%, #c0392b 50%, var(--accent-dark-green) 100%);
+    color:#fff; text-align:center; padding:6rem 2rem; position:relative; overflow:hidden;
+  }
+  
+  .hero h1 { font-family:'Montserrat',sans-serif; font-size:clamp(2.5rem, 5vw, 4.5rem);
+    font-weight:800; margin-bottom:1.2rem; letter-spacing:.02em; line-height:1.2; }
+  
+  .hero p { font-size:1.1rem; opacity:.92; max-width:620px; margin:0 auto 2.5rem; font-weight:300; }
+  
+  .hero-btn {
+    display:inline-block; background:#fff; color:var(--accent-red); padding:.95rem 2.8rem; border-radius:4px;
+    font-weight:700; font-size:.9rem; letter-spacing:.08em; text-transform:uppercase;
+    text-decoration:none; transition:all .2s; border:2px solid #fff;
+  }
+  .hero-btn:hover { background:transparent; color:#fff; }
+
+  .filters-section {
+    max-width:1280px; margin:0 auto; padding:3rem 2rem;
+  }
+
+  .filter-group {
+    display:grid; grid-template-columns:1fr 1fr; gap:2rem; margin-bottom:3rem;
+  }
+
+  .filter-column h3 {
+    font-size:.75rem; text-transform:uppercase; letter-spacing:.15em; color:var(--accent-red);
+    margin-bottom:1rem; font-weight:700;
+  }
+
+  .filter-btns {
+    display:flex; gap:.8rem; flex-wrap:wrap;
+  }
+
+  .filter-btn {
+    padding:.5rem 1rem; border:2px solid var(--border); background:var(--white); border-radius:3px;
+    font-family:'Montserrat',sans-serif; font-size:.8rem; cursor:pointer; color:var(--muted);
+    transition:all .2s; font-weight:600;
+  }
+  
+  .filter-btn.active { background:var(--accent-red); color:#fff; border-color:var(--accent-red); }
+  .filter-btn:hover { border-color:var(--accent-red); color:var(--accent-red); }
+
+  .catalog {
+    max-width:1280px; margin:0 auto; padding:1rem 2rem 4rem;
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:2rem;
+  }
+  
+  .plant-card {
+    background:var(--white); border:1px solid var(--border); border-radius:4px; overflow:hidden;
+    transition:all .3s cubic-bezier(.4,0,.2,1); display:flex; flex-direction:column;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+  
+  .plant-card:hover { 
+    transform:translateY(-6px); box-shadow: 0 12px 30px rgba(0,0,0,.12); border-color:var(--accent-red);
+  }
+  
+  .plant-img {
+    height:220px; display:flex; align-items:center; justify-content:center; position:relative;
+    overflow:hidden; background:var(--light-green); cursor:pointer;
+  }
+  .sold-out-badge {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    background:rgba(0,0,0,.72); color:#fff; padding:.5rem 1.1rem; border-radius:4px;
+    font-size:.8rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; z-index:3;
+  }
+  .plant-card.sold-out-card .plant-img img { filter:grayscale(60%); opacity:.6; }
+  .plant-card.sold-out-card .plant-price { opacity:.5; }
+  
+  .plant-img img { width:100%; height:100%; object-fit:cover; display:block; transition:transform .3s; }
+  .plant-card:hover .plant-img img { transform:scale(1.05); }
+  .plant-img.no-img::after, .gallery-main.no-img::after {
+    content:'🌸'; font-size:3.5rem; opacity:.35;
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-60%);
+  }
+  .plant-img.no-img::before, .gallery-main.no-img::before {
+    content:'фото скоро'; position:absolute; top:50%; left:50%;
+    transform:translate(-50%,40px); font-size:.75rem; color:var(--muted);
+    letter-spacing:.1em; text-transform:uppercase;
+  }
+  .gallery-main { position:relative; }
+  
+  .badge {
+    position:absolute; top:1rem; left:1rem; font-size:.65rem; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; padding:.35rem .8rem; border-radius:2px;
+  }
+  
+  .badge-red { background:var(--accent-red); color:#fff; }
+  .badge-green { background:var(--accent-green); color:#fff; }
+
+  .plant-info { padding:1.5rem; flex:1; display:flex; flex-direction:column; }
+  
+  .plant-category { font-size:.7rem; text-transform:uppercase; letter-spacing:.12em;
+    color:var(--accent-red); margin-bottom:.5rem; font-weight:700; }
+  
+  .plant-name { font-family:'Montserrat',sans-serif; font-size:1.1rem;
+    font-weight:700; margin-bottom:.3rem; line-height:1.3; }
+  
+  .plant-type { font-size:.8rem; color:var(--muted); margin-bottom:.8rem; font-style:italic; }
+  
+  .plant-price { font-size:1.1rem; color:var(--accent-red); font-weight:700; margin-bottom:1rem;
+    font-family:'Montserrat',sans-serif; }
+  
+  .view-btn {
+    width:100%; background:var(--accent-green); color:#fff; border:none; cursor:pointer;
+    padding:.7rem; border-radius:3px; font-family:'Montserrat',sans-serif; font-size:.85rem;
+    font-weight:700; letter-spacing:.08em; text-transform:uppercase; transition:all .2s;
+  }
+  
+  .view-btn:hover { background:var(--accent-dark-green); }
+
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200;
+    opacity:0; pointer-events:none; transition:opacity .3s; }
+  .overlay.open { opacity:1; pointer-events:all; }
+
+  .modal {
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--white);
+    border-radius:6px; width:min(850px, 95vw); max-height:90vh; overflow-y:auto; z-index:300;
+    animation:slideUp .3s ease; box-shadow:0 25px 60px rgba(0,0,0,.3); display:none;
+  }
+  
+  @keyframes slideUp { from { opacity:0; transform:translate(-50%, -45%); }
+    to { opacity:1; transform:translate(-50%, -50%); } }
+  
+  .modal-close { position:absolute; top:1.5rem; right:1.5rem; background:none; border:none;
+    cursor:pointer; font-size:1.6rem; color:var(--muted); transition:color .2s; z-index:10; }
+  .modal-close:hover { color:var(--text); }
+
+  .modal-content {
+    display:grid; grid-template-columns:1fr 1fr; gap:2.5rem; padding:2.5rem;
+  }
+
+  .modal-gallery { display:flex; flex-direction:column; gap:1.2rem; }
+
+  .gallery-main { width:100%; aspect-ratio:1; border-radius:4px; overflow:hidden; background:var(--light-green); }
+  .gallery-main img { width:100%; height:100%; object-fit:cover; }
+
+  .size-tabs {
+    display:flex; gap:.6rem;
+  }
+
+  .size-tab { flex:1; padding:.7rem; border:2px solid var(--border); background:var(--white);
+    border-radius:3px; cursor:pointer; font-weight:700; font-size:.85rem;
+    transition:all .2s; font-family:'Montserrat',sans-serif; }
+
+  .size-tab.active { background:var(--accent-red); color:#fff; border-color:var(--accent-red); }
+  .size-tab:hover:not(.active) { border-color:var(--accent-red); color:var(--accent-red); }
+
+  .modal-info h2 { font-family:'Montserrat',sans-serif; font-size:1.8rem;
+    font-weight:700; margin-bottom:.5rem; }
+
+  .modal-type { display:block; margin-bottom:1rem; font-style:italic; font-size:.95rem; color:var(--muted); }
+
+  .size-selector { background:var(--light-green); padding:1.5rem; border-radius:4px; margin-bottom:1.5rem; }
+
+  .size-label { font-size:.75rem; text-transform:uppercase; letter-spacing:.12em;
+    color:var(--accent-red); margin-bottom:1rem; display:block; font-weight:700; }
+
+  .size-options { display:flex; flex-direction:column; gap:.8rem; margin-bottom:1.5rem; }
+
+  .size-option { display:flex; justify-content:space-between; align-items:center;
+    padding:.95rem; background:var(--white); border-radius:3px; cursor:pointer;
+    border:2px solid transparent; transition:all .2s; }
+
+  .size-option:hover { border-color:var(--accent-red); }
+
+  .size-option.selected { background:var(--accent-red); color:#fff; border-color:var(--accent-red); }
+  .size-option.selected .size-option-price { color:#fff; }
+
+  .size-option-name { font-weight:700; }
+  .size-option-price { color:var(--accent-red); font-weight:700;
+    font-family:'Montserrat',sans-serif; font-size:1rem; }
+
+  .qty-selector { margin-bottom:1.5rem; }
+
+  .qty-label { font-size:.75rem; text-transform:uppercase; letter-spacing:.12em;
+    color:var(--accent-red); margin-bottom:.8rem; display:block; font-weight:700; }
+
+  .qty-ctrl { display:flex; align-items:center; gap:.8rem; }
+
+  .qty-btn { width:40px; height:40px; border:2px solid var(--accent-red); background:var(--white);
+    cursor:pointer; border-radius:3px; font-size:1.2rem; display:flex; align-items:center;
+    justify-content:center; transition:all .15s; font-weight:700; color:var(--accent-red);
+    font-family:'Montserrat',sans-serif; }
+
+  .qty-btn:hover { background:var(--accent-red); color:#fff; }
+
+  .qty-num { flex:1; text-align:center; font-size:1.2rem; font-weight:700; }
+
+  .add-to-cart-btn { width:100%; background:var(--accent-green); color:#fff; border:none;
+    cursor:pointer; padding:1.1rem; border-radius:3px; font-family:'Montserrat',sans-serif;
+    font-size:.95rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    transition:background .2s; }
+
+  .add-to-cart-btn:hover { background:var(--accent-dark-green); }
+
+  .cart-sidebar { position:fixed; top:0; right:-480px; width:min(480px, 100vw); height:100vh;
+    background:var(--white); z-index:250; display:flex; flex-direction:column;
+    transition:right .35s cubic-bezier(.4,0,.2,1); box-shadow:-4px 0 30px rgba(0,0,0,.15); }
+
+  .cart-sidebar.open { right:0; }
+
+  .cart-head { padding:1.5rem; border-bottom:2px solid var(--accent-red);
+    display:flex; align-items:center; justify-content:space-between; }
+
+  .cart-head h2 { font-family:'Montserrat',sans-serif; font-size:1.4rem; font-weight:700;
+    color:var(--accent-red); }
+
+  .close-btn { background:none; border:none; cursor:pointer; font-size:1.5rem;
+    color:var(--muted); transition:color .2s; }
+
+  .close-btn:hover { color:var(--text); }
+
+  .cart-items { flex:1; overflow-y:auto; padding:1.5rem; }
+
+  .cart-empty { text-align:center; padding:3rem 1rem; color:var(--muted);
+    font-family:'Montserrat',sans-serif; font-size:1.1rem; font-weight:500; }
+
+  .cart-item { display:flex; flex-direction:column; gap:.6rem; padding:1.2rem 0;
+    border-bottom:1px solid var(--border); }
+
+  .cart-item-name { font-size:.92rem; font-weight:700; }
+  .cart-item-size { font-size:.8rem; color:var(--muted); }
+  .cart-item-price { font-size:.9rem; color:var(--accent-red); font-weight:700;
+    font-family:'Montserrat',sans-serif; }
+
+  .cart-foot { padding:1.5rem; border-top:2px solid var(--accent-red); }
+
+  .cart-total { display:flex; justify-content:space-between; margin-bottom:1.2rem;
+    font-size:1.05rem; font-weight:700; }
+
+  .cart-total-amount { font-family:'Montserrat',sans-serif; font-size:1.4rem;
+    font-weight:700; color:var(--accent-red); }
+
+  .checkout-btn { width:100%; background:var(--accent-red); color:#fff; border:none;
+    cursor:pointer; padding:1rem; border-radius:3px; font-family:'Montserrat',sans-serif;
+    font-size:.92rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    transition:background .2s; }
+
+  .checkout-btn:hover { background:#d13e00; }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:301;
+    display:none; align-items:center; justify-content:center; padding:1rem; }
+
+  .modal-overlay.open { display:flex; }
+
+  .checkout-modal { background:var(--white); border-radius:6px; width:min(620px, 100%);
+    max-height:90vh; overflow-y:auto; animation:slideUp .3s ease; }
+
+  .modal-head { padding:2rem 2rem 1.5rem; border-bottom:2px solid var(--accent-red);
+    display:flex; align-items:center; justify-content:space-between; }
+
+  .modal-head h2 { font-family:'Montserrat',sans-serif; font-size:1.6rem; font-weight:700;
+    color:var(--accent-red); }
+
+  .modal-body { padding:2rem; }
+
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-bottom:1rem; }
+
+  .form-group { display:flex; flex-direction:column; gap:.4rem; margin-bottom:1rem; }
+
+  .form-group label { font-size:.75rem; text-transform:uppercase; letter-spacing:.1em;
+    color:var(--accent-red); font-weight:700; }
+
+  .form-group input, .form-group select, .form-group textarea { padding:.75rem 1rem;
+    border:1px solid var(--border); border-radius:3px; font-family:'Montserrat',sans-serif;
+    font-size:.92rem; background:var(--white); outline:none; transition:all .2s; color:var(--text); }
+
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color:var(--accent-red); box-shadow: 0 0 0 3px rgba(211, 47, 47, .1); }
+
+  .form-group textarea { resize:vertical; min-height:90px; }
+
+  .section-title { font-size:.75rem; text-transform:uppercase; letter-spacing:.15em;
+    color:var(--accent-red); margin:1.8rem 0 1.2rem; padding-bottom:.6rem;
+    border-bottom:2px solid var(--accent-red); font-weight:700; }
+
+  .order-summary { background:var(--light-green); border-left:4px solid var(--accent-red);
+    border-radius:3px; padding:1.5rem; margin-bottom:1.5rem; }
+
+  .order-summary-row { display:flex; justify-content:space-between; font-size:.9rem;
+    margin-bottom:.5rem; }
+
+  .order-summary-row.total { font-weight:700; font-size:1.1rem; margin-top:1rem;
+    padding-top:1rem; border-top:2px solid rgba(0,0,0,.1); color:var(--accent-red);
+    font-family:'Montserrat',sans-serif; }
+
+  .submit-btn { width:100%; background:var(--accent-red); color:#fff; border:none;
+    cursor:pointer; padding:1.1rem; border-radius:3px; font-family:'Montserrat',sans-serif;
+    font-size:.95rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    transition:background .2s; margin-top:1rem; }
+
+  .submit-btn:hover { background:#d13e00; }
+  .submit-btn:disabled { background:var(--muted); cursor:not-allowed; }
+
+  .success-screen { text-align:center; padding:3.5rem 2rem; }
+
+  .success-icon { font-size:5rem; margin-bottom:1.2rem; }
+
+  .success-screen h2 { font-family:'Montserrat',sans-serif; font-size:2rem;
+    margin-bottom:1rem; color:var(--accent-red); font-weight:700; }
+
+  .success-screen p { color:var(--muted); margin-bottom:.6rem; }
+
+  .toast { position:fixed; bottom:2rem; right:2rem; z-index:400; background:var(--accent-red);
+    color:#fff; padding:1rem 1.5rem; border-radius:4px; font-size:.88rem; opacity:0;
+    transform:translateY(10px); transition:all .3s; pointer-events:none; font-weight:600; }
+
+  .toast.show { opacity:1; transform:translateY(0); }
+
+  footer { background:var(--accent-dark-green); color:#fff; padding:2.5rem;
+    text-align:center; font-size:.85rem; margin-top:3rem; }
+
+  footer a { color:rgba(255,255,255,.85); text-decoration:none; }
+
+  .hidden { display:none !important; }
+
+  @media(max-width:768px) {
+    .form-row { grid-template-columns:1fr; }
+    .filter-group { grid-template-columns:1fr; }
+    nav { gap:1rem; font-size:.7rem; }
+    .modal-content { grid-template-columns:1fr; }
+    .header-inner { padding:0 1rem; }
+    .logo { font-size:1.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <img src="images/logo.png" alt="Green MAMA">
+    </div>
+    <nav>
+      <a href="#catalog">Каталог</a>
+      <a href="#about">О нас</a>
+      <a href="#contact">Контакты</a>
+    </nav>
+    <button class="cart-btn" onclick="openCart()">
+      🛒 <span class="cart-count" id="cartCount">0</span>
+    </button>
+  </div>
+</header>
+
+<section class="hero">
+  <h1>Green MAMA<br>Ассортимент растений 2025</h1>
+  <p>150+ сортов ампельных, кустовых и многолетних растений</p>
+  <a href="#catalog" class="hero-btn">Смотреть каталог →</a>
+</section>
+
+<div class="filters-section" id="catalog">
+  <div class="filter-group">
+    <div class="filter-column">
+      <h3>🌿 Группа растений</h3>
+      <div class="filter-btns" id="groupFilters"></div>
+    </div>
+    <div class="filter-column">
+      <h3>🌸 Вид растения</h3>
+      <div class="filter-btns" id="typeFilters"></div>
+    </div>
+  </div>
+</div>
+
+<div class="catalog" id="catalogGrid"></div>
+
+<div class="overlay" id="overlay" onclick="closeModal()"></div>
+<div class="modal" id="plantModal">
+  <button class="modal-close" onclick="closeModal()">✕</button>
+  <div class="modal-content" id="modalContent"></div>
+</div>
+
+<div class="cart-sidebar" id="cartSidebar">
+  <div class="cart-head">
+    <h2>Корзина</h2>
+    <button class="close-btn" onclick="closeCart()">✕</button>
+  </div>
+  <div class="cart-items" id="cartItems">
+    <div class="cart-empty">Корзина пуста</div>
+  </div>
+  <div class="cart-foot">
+    <div class="cart-total">
+      <span>Итого:</span>
+      <span class="cart-total-amount" id="cartTotal">0 ₸</span>
+    </div>
+    <button class="checkout-btn" onclick="openCheckout()">Оформить →</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="checkoutModal">
+  <div class="checkout-modal">
+    <div class="modal-head">
+      <h2>Оформление заказа</h2>
+      <button class="close-btn" onclick="closeCheckout()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer id="contact">
+  <p>🌱 Green MAMA — Ампельные, кустовые и многолетние растения</p>
+  <p style="margin-top:1rem;">📍 Алматы &nbsp;|&nbsp; 📞 +7 (777) 123-45-67 &nbsp;|&nbsp; ✉️ titiflowers001@gmail.com</p>
+  <p style="margin-top:.8rem; opacity:.75;">© 2025 Green MAMA. Все права защищены</p>
+</footer>
+
+<script>
+emailjs.init('CCkKkk4b4XNl04nfM');
+
+let currentGroup = 'all';
+let currentType = 'all';
+let selectedPlantId = null;
+let selectedSize = 'a1';
+let selectedQty = 1;
+let cart = {};
+
+// ===== Загрузка товаров из products.json (управляется через admin.html) =====
+let PLANTS = [];
+
+function loadProducts() {
+  // Загружаем товары из онлайн-базы и следим за изменениями в реальном времени:
+  // админ поменял остаток — на сайте обновилось само, без перезагрузки.
+  try {
+    DB.watchProducts(function(list){
+      PLANTS = list;
+      if (!window._filtersReady) { initFilters(); window._filtersReady = true; }
+      else { renderCatalog(); }
+    }, true);
+  } catch (err) {
+    console.error('База недоступна:', err);
+    document.getElementById('catalogGrid').innerHTML =
+      '<p style="grid-column:1/-1; text-align:center; color:var(--accent-red); padding:3rem;">' +
+      'Не удалось подключиться к базе. Проверьте настройки в firebase-config.js и интернет-соединение.</p>';
+  }
+}
+
+
+function getGroupsAndTypes() {
+  const groups = [...new Set(PLANTS.map(p => p.group))];
+  const typesByGroup = {};
+  groups.forEach(g => {
+    typesByGroup[g] = [...new Set(PLANTS.filter(p => p.group === g).map(p => p.type))];
+  });
+  return { groups, typesByGroup };
+}
+
+function initFilters() {
+  const { groups, typesByGroup } = getGroupsAndTypes();
+  const groupHtml = `<button class="filter-btn active" onclick="filterByGroup('all')">Все</button>` +
+    groups.map(g => `<button class="filter-btn" onclick="filterByGroup('${g}')">${g}</button>`).join('');
+  document.getElementById('groupFilters').innerHTML = groupHtml;
+  updateTypeFilters();
+  renderCatalog();
+}
+
+function filterByGroup(group) {
+  currentGroup = group;
+  currentType = 'all';
+  document.querySelectorAll('#groupFilters .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  updateTypeFilters();
+  renderCatalog();
+}
+
+function updateTypeFilters() {
+  // Показываем виды (категории) доступные для текущей группы
+  let relevantPlants = currentGroup === 'all' ? PLANTS : PLANTS.filter(p => p.group === currentGroup);
+  // Собираем все уникальные категории из vid
+  const allVids = [];
+  relevantPlants.forEach(p => (p.vid || []).forEach(v => { if (!allVids.includes(v)) allVids.push(v); }));
+  // Фиксированный порядок категорий
+  const order = ['Ампельные','Каскадные','Кустовые','Межвидовые','Многолетние','Однолетние'];
+  const vids = order.filter(v => allVids.includes(v));
+  const typeHtml = `<button class="filter-btn active" onclick="filterByType('all')">Все</button>` +
+    vids.map(v => `<button class="filter-btn" onclick="filterByType('${v}')">${v}</button>`).join('');
+  document.getElementById('typeFilters').innerHTML = typeHtml;
+}
+
+function filterByType(vid) {
+  currentType = vid;
+  document.querySelectorAll('#typeFilters .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderCatalog();
+}
+
+function renderCatalog() {
+  let list = PLANTS.filter(p => {
+    const matchGroup = currentGroup === 'all' || p.group === currentGroup;
+    const matchVid = currentType === 'all' || (p.vid && p.vid.includes(currentType));
+    return matchGroup && matchVid;
+  });
+
+  const grid = document.getElementById('catalogGrid');
+  if (!list.length) {
+    grid.innerHTML = '<p style="grid-column:1/-1; text-align:center; color:var(--muted); padding:3rem;">Растения не найдены</p>';
+    return;
+  }
+
+  grid.innerHTML = list.map(p => {
+    const minPrice = Math.min(...Object.values(p.price));
+    const stock = p.stock || { a1: 99, a2: 99, a3: 99 };
+    const soldOut = (stock.a1 <= 0 && stock.a2 <= 0 && stock.a3 <= 0);
+    return `<div class="plant-card ${soldOut ? 'sold-out-card' : ''}" onclick="openModal(${p.id})">
+      <div class="plant-img">
+        <img src="${p.image_card}" alt="${p.name}" onerror="this.style.display='none'; this.parentElement.classList.add('no-img');">
+        ${soldOut ? '<div class="sold-out-badge">Нет в наличии</div>' : ''}
+      </div>
+      <div class="plant-info">
+        <div class="plant-category">${p.type}</div>
+        <div class="plant-name">${p.name}</div>
+        ${p.desc ? `<div class="plant-type">«${p.desc}»</div>` : '<div class="plant-type">&nbsp;</div>'}
+        <div class="plant-price">от ${minPrice} ₸</div>
+        <button class="view-btn">${soldOut ? 'Посмотреть →' : 'Выбрать размер →'}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openModal(plantId) {
+  selectedPlantId = plantId;
+  selectedSize = 'a1';
+  const plant = PLANTS.find(p => p.id === plantId);
+  const stock = plant.stock || { a1: 99, a2: 99, a3: 99 };
+  window.currentStock = stock;
+  const sizeInfo = {
+    a1: { name: 'Маленький (стаканчик)', price: plant.price.a1 },
+    a2: { name: 'Средний (3 литра)', price: plant.price.a2 },
+    a3: { name: 'Большой (кашпо)', price: plant.price.a3 }
+  };
+  
+  // Количество для каждого размера
+  window.modalQty = { a1: 0, a2: 0, a3: 0 };
+  window.currentSizeInfo = sizeInfo;
+  
+  const html = `
+    <div class="modal-gallery">
+      <div class="gallery-main"><img src="${plant.image_a1}" id="mainImage" alt="${plant.name}" onerror="this.style.display='none'; this.parentElement.classList.add('no-img');"></div>
+      <div class="size-tabs">
+        <button class="size-tab active" onclick="switchSize('a1')">Маленький</button>
+        <button class="size-tab" onclick="switchSize('a2')">Средний</button>
+        <button class="size-tab" onclick="switchSize('a3')">Большой</button>
+      </div>
+      <div style="font-size:.8rem; color:var(--muted); text-align:center; margin-top:.5rem;">
+        👆 Нажми на размер, чтобы посмотреть фото
+      </div>
+    </div>
+    <div class="modal-info">
+      <h2>${plant.name}</h2>
+      <span class="modal-type">${plant.group} — ${plant.type}</span>
+      <div class="size-selector">
+        <span class="size-label">📏 Выберите размеры и количество</span>
+        <div class="size-options">
+          ${['a1','a2','a3'].map(s => {
+            const out = stock[s] <= 0;
+            return `
+            <div class="size-row" style="display:flex; justify-content:space-between; align-items:center; padding:.9rem; background:var(--white); border-radius:3px; margin-bottom:.6rem; border:2px solid var(--border); ${out ? 'opacity:.55;' : ''}">
+              <div style="flex:1;">
+                <div style="font-weight:700; font-size:.9rem;">${sizeInfo[s].name}</div>
+                <div style="color:var(--accent-red); font-weight:700; font-size:.95rem; font-family:'Montserrat';">${sizeInfo[s].price} ₸/шт</div>
+                ${out ? '<div style="color:var(--accent-red); font-size:.75rem; font-weight:700; margin-top:.2rem;">Нет в наличии</div>' : ''}
+              </div>
+              <div style="display:flex; align-items:center; gap:.5rem;">
+                <button class="qty-btn" style="width:34px; height:34px;" onclick="changeSizeQty('${s}', -1)" ${out?'disabled':''}>−</button>
+                <span id="qty_${s}" style="min-width:28px; text-align:center; font-weight:700; font-size:1.1rem;">0</span>
+                <button class="qty-btn" style="width:34px; height:34px;" onclick="changeSizeQty('${s}', 1)" ${out?'disabled':''}>+</button>
+              </div>
+            </div>
+          `; }).join('')}
+        </div>
+      </div>
+      <div style="background:var(--accent-red); color:#fff; padding:1.2rem; border-radius:3px; margin-bottom:1rem; text-align:center; font-weight:700; font-size:1.1rem;">
+        Итого: <span id="modalTotal">0 ₸</span>
+      </div>
+      <button class="add-to-cart-btn" onclick="addToCart()">✓ Добавить в корзину</button>
+    </div>
+  `;
+  document.getElementById('modalContent').innerHTML = html;
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('plantModal').style.display = 'block';
+}
+
+function switchSize(size) {
+  selectedSize = size;
+  const plant = PLANTS.find(p => p.id === selectedPlantId);
+  const imgMap = {a1: plant.image_a1, a2: plant.image_a2, a3: plant.image_a3};
+  const mainImg = document.getElementById('mainImage');
+  const gallery = mainImg.parentElement;
+  gallery.classList.remove('no-img');
+  mainImg.style.display = 'block';
+  mainImg.src = imgMap[size];
+  document.querySelectorAll('.size-tab').forEach((btn, i) => btn.classList.toggle('active', ['a1','a2','a3'][i] === size));
+}
+
+function changeSizeQty(size, delta) {
+  const max = (window.currentStock && window.currentStock[size] != null) ? window.currentStock[size] : 99;
+  let next = (window.modalQty[size] || 0) + delta;
+  next = Math.max(0, Math.min(next, max));
+  if (delta > 0 && next === (window.modalQty[size] || 0) && max <= (window.modalQty[size] || 0)) {
+    showToast('На складе только ' + max + ' шт этого размера');
+  }
+  window.modalQty[size] = next;
+  document.getElementById('qty_' + size).textContent = window.modalQty[size];
+  updateModalTotal();
+}
+
+function updateModalTotal() {
+  let total = 0;
+  ['a1','a2','a3'].forEach(s => {
+    total += (window.modalQty[s] || 0) * window.currentSizeInfo[s].price;
+  });
+  document.getElementById('modalTotal').textContent = total.toLocaleString('ru') + ' ₸';
+}
+
+function addToCart() {
+  const plant = PLANTS.find(p => p.id === selectedPlantId);
+  const qtys = window.modalQty;
+  const totalSelected = (qtys.a1 || 0) + (qtys.a2 || 0) + (qtys.a3 || 0);
+  
+  if (totalSelected === 0) {
+    showToast('Выберите количество хотя бы одного размера');
+    return;
+  }
+  
+  // Добавляем все размеры с количеством > 0
+  ['a1','a2','a3'].forEach(size => {
+    if (qtys[size] > 0) {
+      const key = `${selectedPlantId}-${size}`;
+      cart[key] = (cart[key] || 0) + qtys[size];
+    }
+  });
+  
+  updateCartUI();
+  closeModal();
+  showToast(`✓ ${plant.name} добавлено (${totalSelected} шт)`);
+}
+
+function changeCartQty(key, delta) {
+  cart[key] = (cart[key] || 0) + delta;
+  if (cart[key] <= 0) {
+    delete cart[key];
+  }
+  updateCartUI();
+}
+
+function removeFromCart(key) {
+  delete cart[key];
+  updateCartUI();
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('plantModal').style.display = 'none';
+}
+
+function updateCartUI() {
+  const total = Object.values(cart).reduce((s,v) => s+v, 0);
+  document.getElementById('cartCount').textContent = total;
+  const items = document.getElementById('cartItems');
+  const keys = Object.keys(cart).filter(k => cart[k] > 0);
+  if (!keys.length) {
+    items.innerHTML = '<div class="cart-empty">Корзина пуста</div>';
+    document.getElementById('cartTotal').textContent = '0 ₸';
+    return;
+  }
+  let sum = 0;
+  items.innerHTML = keys.map(k => {
+    const parts = k.split('-');
+    const size = parts[parts.length - 1];
+    const plantId = parseInt(parts.slice(0, -1).join('-'));
+    const p = PLANTS.find(x => x.id == plantId);
+    const price = p.price[size];
+    const qty = cart[k];
+    const subtotal = price * qty;
+    sum += subtotal;
+    const sizeLabels = {a1:'Маленький (стаканчик)', a2:'Средний (3 литра)', a3:'Большой (кашпо)'};
+    const sizeBadge = {a1:'#bbd004', a2:'#fb4e04', a3:'#8a6d2f'};
+    return `<div class="cart-item">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem;">
+        <div style="flex:1;">
+          <div class="cart-item-name">${p.name}</div>
+          <div style="display:inline-block; background:${sizeBadge[size]}; color:#fff; font-size:.7rem; padding:.2rem .6rem; border-radius:3px; margin-top:.3rem; font-weight:600;">${sizeLabels[size]}</div>
+        </div>
+        <button onclick="removeFromCart('${k}')" style="background:none; border:none; cursor:pointer; color:var(--muted); font-size:1.2rem; padding:0 .3rem;" title="Удалить">🗑️</button>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:.6rem;">
+        <div style="display:flex; align-items:center; gap:.5rem;">
+          <button onclick="changeCartQty('${k}', -1)" style="width:28px; height:28px; border:1px solid var(--accent-red); background:#fff; color:var(--accent-red); border-radius:3px; cursor:pointer; font-weight:700; font-size:1rem;">−</button>
+          <span style="min-width:30px; text-align:center; font-weight:700;">${qty}</span>
+          <button onclick="changeCartQty('${k}', 1)" style="width:28px; height:28px; border:1px solid var(--accent-red); background:#fff; color:var(--accent-red); border-radius:3px; cursor:pointer; font-weight:700; font-size:1rem;">+</button>
+          <span style="font-size:.8rem; color:var(--muted); margin-left:.3rem;">× ${price} ₸</span>
+        </div>
+        <div class="cart-item-price">${subtotal.toLocaleString('ru')} ₸</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('cartTotal').textContent = sum.toLocaleString('ru') + ' ₸';
+}
+
+function openCart() {
+  document.getElementById('cartSidebar').classList.add('open');
+}
+
+function closeCart() {
+  document.getElementById('cartSidebar').classList.remove('open');
+}
+
+function openCheckout() {
+  if (!Object.keys(cart).length) { showToast('Добавьте растения в корзину'); return; }
+  closeCart();
+  const keys = Object.keys(cart).filter(k => cart[k] > 0);
+  let sum = 0;
+  const orderRows = keys.map(k => {
+    const parts = k.split('-');
+    const size = parts[parts.length - 1];
+    const plantId = parseInt(parts.slice(0, -1).join('-'));
+    const p = PLANTS.find(x => x.id == plantId);
+    const price = p.price[size];
+    const subtotal = price * cart[k];
+    sum += subtotal;
+    const sizeLabels = {a1:'Маленький', a2:'Средний', a3:'Большой'};
+    return `<div class="order-summary-row"><span>${p.name} (${sizeLabels[size]}) × ${cart[k]} шт</span><span>${subtotal.toLocaleString('ru')} ₸</span></div>`;
+  }).join('');
+  document.getElementById('modalBody').innerHTML = `<div class="section-title">Состав заказа</div><div class="order-summary">${orderRows}<div class="order-summary-row total"><span>ИТОГО:</span><span>${sum.toLocaleString('ru')} ₸</span></div></div><div class="section-title">Ваши данные</div><div class="form-row"><div class="form-group"><label>Имя *</label><input id="f_name" type="text" placeholder="Ваше имя"></div><div class="form-group"><label>Фамилия *</label><input id="f_surname" type="text" placeholder="Фамилия"></div></div><div class="form-row"><div class="form-group"><label>Телефон *</label><input id="f_phone" type="tel" placeholder="+7 (___) ___-__-__"></div><div class="form-group"><label>Email</label><input id="f_email" type="email" placeholder="email@example.com"></div></div><div class="form-group"><label>Адрес доставки *</label><input id="f_address" type="text" placeholder="Улица, дом, квартира"></div><div class="form-row"><div class="form-group"><label>Город</label><input id="f_city" type="text" placeholder="Алматы" value="Алматы"></div><div class="form-group"><label>Время доставки</label><select id="f_time"><option>Утро (9:00–12:00)</option><option>День (12:00–17:00)</option><option>Вечер (17:00–21:00)</option></select></div></div><div class="form-group"><label>Комментарий</label><textarea id="f_comment" placeholder="Пожелания..."></textarea></div><button class="submit-btn" onclick="submitOrder(${sum})">Отправить заказ →</button>`;
+  document.getElementById('checkoutModal').classList.add('open');
+}
+
+function closeCheckout() {
+  document.getElementById('checkoutModal').classList.remove('open');
+}
+
+function submitOrder(totalPrice) {
+  const name = document.getElementById('f_name').value.trim();
+  const surname = document.getElementById('f_surname').value.trim();
+  const phone = document.getElementById('f_phone').value.trim();
+  const address = document.getElementById('f_address').value.trim();
+  if (!name || !phone || !address) { showToast('Заполните обязательные поля'); return; }
+  const btn = document.querySelector('.submit-btn');
+  btn.disabled = true; btn.textContent = 'Отправляем…';
+  const email = document.getElementById('f_email').value.trim();
+  const time = document.getElementById('f_time').value;
+  const comment = document.getElementById('f_comment').value.trim();
+  const keys = Object.keys(cart).filter(k => cart[k] > 0);
+  const sizeLabels = {a1:'Маленький', a2:'Средний', a3:'Большой'};
+  const orderItems = keys.map(k => {
+    const parts = k.split('-');
+    const size = parts[parts.length - 1];
+    const plantId = parseInt(parts.slice(0, -1).join('-'));
+    const p = PLANTS.find(x => x.id == plantId);
+    return `${p.name} (${sizeLabels[size]}) × ${cart[k]} шт. = ${p.price[size] * cart[k]} ₸`;
+  }).join('\n');
+  const emailParams = {customer_name: name, customer_surname: surname, customer_phone: phone, customer_email: email, customer_address: address, delivery_time: time, order_items: orderItems, total_price: totalPrice.toLocaleString('ru'), comment: comment || 'Нет'};
+
+  // Состав заказа для базы (по нему спишутся остатки на складе)
+  const dbItems = keys.map(k => {
+    const parts = k.split('-');
+    const size = parts[parts.length - 1];
+    const plantId = parseInt(parts.slice(0, -1).join('-'));
+    const p = PLANTS.find(x => x.id == plantId);
+    return { plantId: plantId, name: p.name, size: size, qty: cart[k], price: p.price[size] };
+  });
+
+  // 1) Записываем заказ в базу и списываем склад (атомарно, с проверкой наличия)
+  DB.createOrder({
+    name: (name + ' ' + surname).trim(), phone: phone, email: email,
+    address: address, deliveryTime: time, comment: comment, total: totalPrice
+  }, dbItems).then(() => {
+    // 2) Только после успешного списания отправляем письмо
+    return emailjs.send('service_6jdqo3f', 'template_1iect2c', emailParams);
+  }).then((response) => {
+    console.log('Успешно отправлено!', response.status, response.text);
+    document.getElementById('modalBody').innerHTML = `<div class="success-screen"><div class="success-icon">✓</div><h2>Заказ принят!</h2><p><strong>${name}</strong>, спасибо за заказ!</p><p>Менеджер свяжется в течение 30 минут</p><p style="margin-top:.8rem; font-size:.9rem; color:var(--muted);">Номер: <strong>${phone}</strong></p><button style="margin-top:2rem" class="checkout-btn" onclick="resetOrder()">Закрыть</button></div>`;
+    showToast('✓ Заказ отправлен!');
+  }).catch((err) => {
+    console.error('ОШИБКА EmailJS:', err);
+    
+    // Собираем ВСЮ информацию об ошибке
+    const status = err && err.status ? err.status : 'неизвестно';
+    const text = err && err.text ? err.text : (typeof err === 'string' ? err : JSON.stringify(err));
+    
+    // Показываем большой подробный блок с ошибкой
+    document.getElementById('modalBody').innerHTML = `
+      <div style="padding:1rem;">
+        <div style="background:#fff0e8; border:2px solid #fb4e04; border-radius:6px; padding:1.5rem; margin-bottom:1.5rem;">
+          <h3 style="color:#fb4e04; margin-bottom:1rem; font-size:1.2rem;">⚠️ Ошибка отправки</h3>
+          <div style="background:#fff; padding:1rem; border-radius:4px; margin-bottom:1rem;">
+            <div style="font-size:.8rem; color:#666; margin-bottom:.3rem;">Код ошибки:</div>
+            <div style="font-size:1.5rem; font-weight:700; color:#fb4e04;">${status}</div>
+          </div>
+          <div style="background:#fff; padding:1rem; border-radius:4px;">
+            <div style="font-size:.8rem; color:#666; margin-bottom:.3rem;">Текст ошибки (ПОКАЖИ ЭТО!):</div>
+            <div style="font-size:1.1rem; font-weight:700; color:#fb4e04; word-break:break-word;">${text}</div>
+          </div>
+        </div>
+        <p style="font-size:.9rem; color:#666; margin-bottom:1rem;">📋 Скопируй текст ошибки выше и пришли его — это точно укажет причину.</p>
+        <button class="checkout-btn" onclick="openCheckout()">← Вернуться к форме</button>
+      </div>
+    `;
+    showToast('Ошибка ' + status);
+  });
+}
+
+function resetOrder() {
+  closeCheckout();
+  cart = {};
+  updateCartUI();
+  renderCatalog();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+loadProducts();
+</script>
+</body>
+</html>
