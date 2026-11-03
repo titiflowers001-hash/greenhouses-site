@@ -1,20 +1,70 @@
 // ============================================================
 //  Слой работы с базой Firebase (общий для сайта и админки)
-//  Ничего менять не нужно — настройки в firebase-config.js
+//  Настройки подключения — в firebase-config.js
+//
+//  ПРИНЦИП УЧЁТА: остаток меняется ТОЛЬКО через операции
+//  (приход, пересадка, списание, продажа). Каждая операция хранит
+//  свои «эффекты» — сколько и где прибавилось/убавилось. Поэтому её
+//  можно отредактировать или удалить, и склад пересчитается сам.
 // ============================================================
 
 firebase.initializeApp(window.firebaseConfig);
 const db = firebase.firestore();
+const FV = firebase.firestore.FieldValue;
 
 // Коллекции (таблицы) в базе
 const COL = {
-  products:  db.collection('products'),   // товары + остатки
-  orders:    db.collection('orders'),     // заказы
+  products:  db.collection('products'),   // карточки растений + остатки по размерам
+  orders:    db.collection('orders'),     // продажи: заказы с сайта и продажи в магазине
   customers: db.collection('customers'),  // клиенты
   expenses:  db.collection('expenses'),   // расходы бизнеса
-  moves:     db.collection('stock_moves'),// приход / списание товара
-  materials: db.collection('materials')   // сырьё (земля, горшки, удобрения, черенки, семена)
+  moves:     db.collection('stock_moves'),// журнал операций
+  materials: db.collection('materials')   // сырьё: земля, удобрения, горшки, кассеты, черенки, семена
 };
+
+// ---------- РАЗМЕРЫ ----------
+// l — объём земли в литрах (для расчёта при пересадке). Кассета = 0.
+const SIZES = [
+  { k: 'k',   name: 'Кассета', short: 'Кас', l: 0   },
+  { k: 's02', name: '0.2 л',   short: '0.2', l: 0.2 },
+  { k: 's05', name: '0.5 л',   short: '0.5', l: 0.5 },
+  { k: 's1',  name: '1 л',     short: '1',   l: 1   },
+  { k: 's3',  name: '3 л',     short: '3',   l: 3   },
+  { k: 's5',  name: '5 л',     short: '5',   l: 5   },
+  { k: 's7',  name: '7 л',     short: '7',   l: 7   },
+  { k: 's10', name: '10 л',    short: '10',  l: 10  }
+];
+const SIZE = k => SIZES.find(s => s.k === k) || { k, name: k, short: k, l: 0 };
+// Карточка «в кассетах» имеет один размер — кассета. Обычная — все горшки.
+const sizesOf = p => (p && p.cassette) ? SIZES.filter(s => s.k === 'k') : SIZES.filter(s => s.k !== 'k');
+
+const currentUserEmail = () => {
+  try { const u = firebase.auth && firebase.auth().currentUser; return u ? (u.email || u.uid) : ''; }
+  catch (e) { return ''; }
+};
+
+// Склеивает одинаковые эффекты: {c:'p'|'m', id, size?, d}
+function mergeEffects(list) {
+  const map = {};
+  (list || []).forEach(e => {
+    if (!e || !e.d) return;
+    const key = e.c + '|' + e.id + '|' + (e.size || '');
+    if (!map[key]) map[key] = { c: e.c, id: String(e.id), d: 0 };
+    if (e.size) map[key].size = e.size;
+    map[key].d = Math.round((map[key].d + Number(e.d)) * 1000) / 1000;
+  });
+  return Object.values(map).filter(e => e.d !== 0);
+}
+// Разница «новые минус старые» — то, что надо применить при редактировании
+function diffEffects(oldList, newList) {
+  return mergeEffects([...(newList || []), ...(oldList || []).map(e => ({ ...e, d: -e.d }))]);
+}
+function applyEffects(batch, effects) {
+  mergeEffects(effects).forEach(e => {
+    if (e.c === 'p') batch.update(COL.products.doc(String(e.id)), { ['stock.' + e.size]: FV.increment(e.d) });
+    else if (e.c === 'm') batch.update(COL.materials.doc(String(e.id)), { stock: FV.increment(e.d) });
+  });
+}
 
 const DB = {
   // ---------- ТОВАРЫ ----------
@@ -34,134 +84,153 @@ const DB = {
     });
   },
 
+  // Сохраняет карточку. Остатки здесь НЕ меняются — только через операции.
   async saveProduct(product) {
     const id = String(product.id);
-    await COL.products.doc(id).set(product, { merge: true });
+    const data = { ...product }; delete data._docId; delete data.stock;
+    const ref = COL.products.doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) data.stock = {};
+    await ref.set(data, { merge: true });
     return id;
   },
-
+  async setPrices(id, price) {
+    await COL.products.doc(String(id)).update({ price });
+  },
   async deleteProduct(id) {
     await COL.products.doc(String(id)).delete();
   },
-
-  async setStock(id, size, qty) {
-    await COL.products.doc(String(id)).update({ ['stock.' + size]: Math.max(0, qty) });
-  },
-
   async setActive(id, active) {
     await COL.products.doc(String(id)).update({ active: !!active });
   },
 
-  // ---------- ЗАКАЗЫ ----------
-  // items: [{ plantId, name, size, qty, price }]
-  // Покупатель на сайте только ОСТАВЛЯЕТ заявку. Склад не трогается —
-  // товары спишутся позже, когда админ нажмёт «Подтвердить» (confirmOrder).
-  async createOrder(order, items) {
-    const orderRef = COL.orders.doc();
-    await orderRef.set({
-      ...order,
-      items,
-      status: 'new',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    return orderRef.id;
-  },
-
-  // Подтверждение заказа АДМИНОМ: вот теперь списываем склад, заносим
-  // клиента и пишем движения. По правилам базы это может сделать только
-  // вошедший администратор.
-  async confirmOrder(docId) {
-    const orderRef = COL.orders.doc(docId);
-    const orderSnap = await orderRef.get();
-    if (!orderSnap.exists) throw new Error('Заказ не найден');
-    const order = orderSnap.data();
-    if (order.status === 'done') return docId;      // уже подтверждён
-    const items = order.items || [];
-
-    // Транзакция: проверяем остатки и списываем их атомарно
-    await db.runTransaction(async tx => {
-      const refs = items.map(it => COL.products.doc(String(it.plantId)));
-      const snaps = await Promise.all(refs.map(r => tx.get(r)));
-
-      // 1) Проверка наличия
-      snaps.forEach((snap, i) => {
-        const it = items[i];
-        if (!snap.exists) throw new Error(`Товар «${it.name}» больше не в базе`);
-        const have = (snap.data().stock || {})[it.size] ?? 0;
-        if (have < it.qty) {
-          throw new Error(`«${it.name}» — в наличии только ${have} шт, а в заказе ${it.qty}`);
-        }
-      });
-
-      // 2) Списание
-      snaps.forEach((snap, i) => {
-        const it = items[i];
-        const have = (snap.data().stock || {})[it.size] ?? 0;
-        tx.update(refs[i], { ['stock.' + it.size]: have - it.qty });
-      });
-
-      // 3) Отмечаем заказ выполненным
-      tx.update(orderRef, {
-        status: 'done',
-        confirmedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    });
-
-    // Клиент в базу контактов
-    if (order.phone) await DB.upsertCustomer(order, items);
-
-    // Движения склада (история списаний)
-    for (const it of items) {
-      await COL.moves.add({
-        type: 'sale', plantId: it.plantId, name: it.name, size: it.size,
-        qty: -it.qty, note: 'Заказ ' + (order.name || ''),
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
+  // ---------- ОПЕРАЦИИ (приход, пересадка, списание, продажа) ----------
+  // op: { type, form, effects, summary, note }
+  // extra.expense: {cat, sum, note} — расход, который создаётся вместе с операцией
+  // extra.order:   данные продажи в магазине (создаётся документ в orders)
+  // extra.orderId + extra.confirmOrder: подтверждение заказа с сайта
+  async createOp(op, extra) {
+    extra = extra || {};
+    const batch = db.batch();
+    const moveRef = COL.moves.doc();
+    const effects = mergeEffects(op.effects);
+    applyEffects(batch, effects);
+    const move = {
+      type: op.type, form: op.form || {}, effects, summary: op.summary || '', note: op.note || '',
+      author: currentUserEmail(), createdAt: FV.serverTimestamp()
+    };
+    if (extra.expense && extra.expense.sum > 0) {
+      const expRef = COL.expenses.doc();
+      batch.set(expRef, { ...extra.expense, date: new Date().toISOString().slice(0, 10), moveId: moveRef.id, createdAt: FV.serverTimestamp() });
+      move.expenseId = expRef.id;
     }
-
-    return docId;
+    if (extra.order) {
+      const ordRef = COL.orders.doc();
+      batch.set(ordRef, { ...extra.order, source: 'manual', status: 'done', moveId: moveRef.id,
+        author: move.author, createdAt: FV.serverTimestamp(), confirmedAt: FV.serverTimestamp() });
+      move.orderId = ordRef.id;
+    }
+    if (extra.orderId) {
+      move.orderId = extra.orderId;
+      if (extra.confirmOrder) batch.update(COL.orders.doc(extra.orderId), { status: 'done', moveId: moveRef.id, confirmedAt: FV.serverTimestamp() });
+    }
+    batch.set(moveRef, move);
+    await batch.commit();
+    return moveRef.id;
   },
 
-  async getOrders(limit) {
-    const snap = await COL.orders.orderBy('createdAt', 'desc').limit(limit || 300).get();
+  // Редактирование: применяем только разницу между старыми и новыми эффектами
+  async updateOp(moveId, op, extra) {
+    extra = extra || {};
+    const ref = COL.moves.doc(moveId);
+    const snap = await ref.get();
+    if (!snap.exists) throw new Error('Операция не найдена');
+    const old = snap.data();
+    if (old.type === 'start') throw new Error('Стартовую загрузку нельзя редактировать');
+    const effects = mergeEffects(op.effects);
+    const batch = db.batch();
+    applyEffects(batch, diffEffects(old.effects, effects));
+    const upd = { form: op.form || {}, effects, summary: op.summary || '', note: op.note || '',
+      editedBy: currentUserEmail(), editedAt: FV.serverTimestamp() };
+    // расход, привязанный к операции
+    const sum = extra.expense ? (extra.expense.sum || 0) : 0;
+    if (old.expenseId && sum > 0) batch.update(COL.expenses.doc(old.expenseId), { ...extra.expense });
+    else if (old.expenseId && sum <= 0) { batch.delete(COL.expenses.doc(old.expenseId)); upd.expenseId = FV.delete(); }
+    else if (!old.expenseId && sum > 0) {
+      const expRef = COL.expenses.doc();
+      batch.set(expRef, { ...extra.expense, date: new Date().toISOString().slice(0, 10), moveId, createdAt: FV.serverTimestamp() });
+      upd.expenseId = expRef.id;
+    }
+    if (extra.order && old.orderId) batch.update(COL.orders.doc(old.orderId), { ...extra.order });
+    batch.update(ref, upd);
+    await batch.commit();
+  },
+
+  // Удаление: эффекты откатываются, связанный расход удаляется.
+  // Продажа в магазине удаляется целиком, заказ с сайта возвращается в «Новые».
+  async deleteOp(moveId) {
+    const ref = COL.moves.doc(moveId);
+    const snap = await ref.get();
+    if (!snap.exists) return;
+    const old = snap.data();
+    const batch = db.batch();
+    applyEffects(batch, (old.effects || []).map(e => ({ ...e, d: -e.d })));
+    if (old.expenseId) batch.delete(COL.expenses.doc(old.expenseId));
+    if (old.orderId) {
+      const oSnap = await COL.orders.doc(old.orderId).get();
+      if (oSnap.exists) {
+        if (oSnap.data().source === 'manual') batch.delete(oSnap.ref);
+        else batch.update(oSnap.ref, { status: 'new', moveId: FV.delete() });
+      }
+    }
+    batch.delete(ref);
+    await batch.commit();
+  },
+
+  async getMoves(limit) {
+    const snap = await COL.moves.orderBy('createdAt', 'desc').limit(limit || 2000).get();
     return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
   },
 
+  // ---------- ЗАКАЗЫ С САЙТА ----------
+  // items: [{ plantId, name, size, qty, price }]
+  // Покупатель только ОСТАВЛЯЕТ заявку — склад не трогается до подтверждения.
+  async createOrder(order, items) {
+    const orderRef = COL.orders.doc();
+    await orderRef.set({ ...order, items, source: 'site', status: 'new', createdAt: FV.serverTimestamp() });
+    return orderRef.id;
+  },
+  async getOrders(limit) {
+    const snap = await COL.orders.orderBy('createdAt', 'desc').limit(limit || 1000).get();
+    return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+  },
   async setOrderStatus(docId, status) {
     await COL.orders.doc(docId).update({ status });
   },
-
   async deleteOrder(docId) {
     await COL.orders.doc(docId).delete();
   },
 
   // ---------- КЛИЕНТЫ ----------
-  async upsertCustomer(order, items) {
-    const phone = String(order.phone).replace(/\D/g, '');
+  async upsertCustomer(order, total) {
+    const phone = String(order.phone || '').replace(/\D/g, '');
     if (!phone) return;
     const ref = COL.customers.doc(phone);
     const snap = await ref.get();
-    const sum = items.reduce((s, it) => s + it.qty * it.price, 0);
     if (snap.exists) {
       const d = snap.data();
       await ref.update({
-        name: order.name || d.name,
-        email: order.email || d.email || '',
-        address: order.address || d.address || '',
-        ordersCount: (d.ordersCount || 0) + 1,
-        totalSpent: (d.totalSpent || 0) + sum,
-        lastOrderAt: firebase.firestore.FieldValue.serverTimestamp()
+        name: order.name || d.name, email: order.email || d.email || '', address: order.address || d.address || '',
+        ordersCount: (d.ordersCount || 0) + 1, totalSpent: (d.totalSpent || 0) + (total || 0),
+        lastOrderAt: FV.serverTimestamp()
       });
     } else {
       await ref.set({
-        phone, name: order.name || '', email: order.email || '',
-        address: order.address || '', ordersCount: 1, totalSpent: sum,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        lastOrderAt: firebase.firestore.FieldValue.serverTimestamp()
+        phone, name: order.name || '', email: order.email || '', address: order.address || '',
+        ordersCount: 1, totalSpent: total || 0, createdAt: FV.serverTimestamp(), lastOrderAt: FV.serverTimestamp()
       });
     }
   },
-
   async getCustomers() {
     const snap = await COL.customers.orderBy('totalSpent', 'desc').get();
     return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
@@ -169,48 +238,17 @@ const DB = {
 
   // ---------- РАСХОДЫ ----------
   async addExpense(exp) {
-    await COL.expenses.add({ ...exp, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    await COL.expenses.add({ ...exp, createdAt: FV.serverTimestamp() });
   },
   async getExpenses() {
-    const snap = await COL.expenses.orderBy('createdAt', 'desc').limit(500).get();
+    const snap = await COL.expenses.orderBy('createdAt', 'desc').limit(1000).get();
     return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
   },
   async deleteExpense(docId) {
     await COL.expenses.doc(docId).delete();
   },
 
-  // ---------- СЫРЬЁ (материалы) ----------
-  // Закуп сырья из вкладки «Расходы»: находим сырьё по названию+виду
-  // (или создаём новое), пополняем остаток, усредняем цену и пишем расход.
-  async purchaseMaterial({ name, kind, qty, cost, date, note }) {
-    const addQty = Number(qty) || 0;
-    const addCost = Number(cost) || 0;
-    const found = await COL.materials.where('name', '==', name).where('kind', '==', kind).limit(1).get();
-    if (!found.empty) {
-      const ref = found.docs[0].ref;
-      await db.runTransaction(async tx => {
-        const d = (await tx.get(ref)).data();
-        const have = d.stock || 0, avg = d.avgCost || 0;
-        const newStock = have + addQty;
-        const newAvg = newStock > 0 ? (have * avg + addCost) / newStock : 0;
-        tx.update(ref, { stock: newStock, avgCost: Math.round(newAvg) });
-      });
-    } else {
-      await COL.materials.add({
-        name, kind,
-        stock: addQty,
-        avgCost: addQty > 0 ? Math.round(addCost / addQty) : 0
-      });
-    }
-    const catByKind = { soil:'Земля', fertilizer:'Удобрения', pot:'Горшки', cutting:'Покупной черенок', seed:'Покупные семена' };
-    await COL.expenses.add({
-      cat: catByKind[kind] || 'Закуп сырья',
-      sum: addCost,
-      date: date || new Date().toISOString().slice(0, 10),
-      note: note || name,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-  },
+  // ---------- СЫРЬЁ ----------
   async getMaterials() {
     const snap = await COL.materials.get();
     return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
@@ -218,84 +256,74 @@ const DB = {
   watchMaterials(cb) {
     return COL.materials.onSnapshot(snap => cb(snap.docs.map(d => ({ ...d.data(), _docId: d.id }))));
   },
-  // Создание/редактирование сырья. _docId есть → правим, нет → создаём.
+  // Создание/редактирование сырья (без остатка — он меняется операциями)
   async saveMaterial(m) {
-    const data = { ...m }; delete data._docId;
+    const data = { ...m }; delete data._docId; delete data.stock;
     if (m._docId) { await COL.materials.doc(m._docId).set(data, { merge: true }); return m._docId; }
-    if (data.stock == null) data.stock = 0;
-    if (data.avgCost == null) data.avgCost = 0;
+    data.stock = 0; data.avgCost = 0;
     const ref = await COL.materials.add(data);
     return ref.id;
   },
   async deleteMaterial(docId) {
     await COL.materials.doc(String(docId)).delete();
   },
-  // Приход сырья: пополняем остаток, пересчитываем среднюю цену
-  // (сумма закупа ÷ количество, усредняя с уже имеющимся) и пишем расход.
-  async receiveMaterial(docId, qty, totalCost, note) {
-    const ref = COL.materials.doc(String(docId));
-    const pre = await ref.get();
-    if (!pre.exists) throw new Error('Сырьё не найдено в базе');
-    const m0 = pre.data();
-    const addQty = Number(qty) || 0;
-    const addCost = Number(totalCost) || 0;
-    await db.runTransaction(async tx => {
-      const snap = await tx.get(ref);
-      const m = snap.data();
-      const have = m.stock || 0, avg = m.avgCost || 0;
-      const newStock = have + addQty;
-      const newAvg = newStock > 0 ? (have * avg + addCost) / newStock : 0;
-      tx.update(ref, { stock: newStock, avgCost: Math.round(newAvg) });
+
+  // ---------- ЗАГРУЗКА СТАРТОВЫХ ОСТАТКОВ ----------
+  // plan.products: [{ id, data? (для новой карточки), stock:{size:qty}, price:{size:price} }]
+  // plan.materials: [{ docId? , name, kind, size?, stock }]
+  async applyImport(plan, fileName, onProgress) {
+    const ops = [];
+    plan.products.forEach(p => {
+      const ref = COL.products.doc(String(p.id));
+      const data = { ...(p.data || {}), stock: p.stock };
+      if (p.price && Object.keys(p.price).length) data.price = p.price;
+      ops.push(b => b.set(ref, data, { merge: true }));
     });
-    const catByKind = { soil:'Земля', fertilizer:'Удобрения', pot:'Горшки', cutting:'Покупной черенок', seed:'Покупные семена' };
-    if (addCost > 0) {
-      await COL.expenses.add({
-        cat: catByKind[m0.kind] || 'Закуп сырья',
-        sum: addCost,
-        date: new Date().toISOString().slice(0, 10),
-        note: (note ? note + ' · ' : 'Приход · ') + (m0.name || ''),
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    }
-    return docId;
-  },
-
-  // ---------- ПРИХОД / СПИСАНИЕ ТОВАРА ----------
-  // type: 'income' (приход) | 'writeoff' (списание брака/потерь)
-  async addStockMove(move) {
-    const ref = COL.products.doc(String(move.plantId));
-    await db.runTransaction(async tx => {
-      const snap = await tx.get(ref);
-      if (!snap.exists) throw new Error('Товар не найден в базе');
-      const have = (snap.data().stock || {})[move.size] ?? 0;
-      const next = Math.max(0, have + move.qty); // qty: + приход, − списание
-      tx.update(ref, { ['stock.' + move.size]: next });
+    plan.materials.forEach(m => {
+      const ref = m.docId ? COL.materials.doc(m.docId) : COL.materials.doc();
+      const data = { name: m.name, kind: m.kind, stock: m.stock };
+      if (m.size) data.size = m.size;
+      if (!m.docId) data.avgCost = 0;
+      ops.push(b => b.set(ref, data, { merge: true }));
     });
-    await COL.moves.add({ ...move, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-  },
-
-  async getMoves(limit) {
-    const snap = await COL.moves.orderBy('createdAt', 'desc').limit(limit || 300).get();
-    return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
-  },
-
-  // ---------- ПЕРВОНАЧАЛЬНАЯ ЗАГРУЗКА ТОВАРОВ ----------
-  async importProducts(list, onProgress) {
-    let done = 0;
-    for (let i = 0; i < list.length; i += 400) {
+    for (let i = 0; i < ops.length; i += 400) {
       const batch = db.batch();
-      list.slice(i, i + 400).forEach(p => {
-        batch.set(COL.products.doc(String(p.id)), {
-          stock: { a1: 0, a2: 0, a3: 0 }, active: true, desc: '', ...p
-        }, { merge: true });
-      });
+      ops.slice(i, i + 400).forEach(f => f(batch));
       await batch.commit();
-      done = Math.min(i + 400, list.length);
-      if (onProgress) onProgress(done, list.length);
+      if (onProgress) onProgress(Math.min(i + 400, ops.length), ops.length);
     }
-    return done;
+    await COL.moves.add({
+      type: 'start', effects: [], form: {}, author: currentUserEmail(), createdAt: FV.serverTimestamp(),
+      summary: 'Стартовые остатки из файла ' + (fileName || '') + ': растений ' + plan.products.length + ', сырья ' + plan.materials.length
+    });
+  },
+
+  // ---------- ОБНУЛЕНИЕ БАЗЫ ----------
+  // Удаляет операции, продажи, клиентов, расходы, сырьё.
+  // Карточки растений остаются, но их остатки, цены и себестоимость обнуляются.
+  async resetAll(onProgress) {
+    const cols = [['операции', COL.moves], ['продажи', COL.orders], ['клиенты', COL.customers],
+                  ['расходы', COL.expenses], ['сырьё', COL.materials]];
+    for (const [label, col] of cols) {
+      while (true) {
+        const snap = await col.limit(400).get();
+        if (snap.empty) break;
+        const batch = db.batch();
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        if (onProgress) onProgress('Удаляю ' + label + '...');
+      }
+    }
+    const prods = await COL.products.get();
+    for (let i = 0; i < prods.docs.length; i += 400) {
+      const batch = db.batch();
+      prods.docs.slice(i, i + 400).forEach(d => batch.update(d.ref, { stock: {}, price: {}, cost: {} }));
+      await batch.commit();
+      if (onProgress) onProgress('Обнуляю карточки: ' + Math.min(i + 400, prods.docs.length) + ' из ' + prods.docs.length);
+    }
   }
 };
 
 window.DB = DB;
+window.SIZES = SIZES; window.SIZE = SIZE; window.sizesOf = sizesOf;
 window._fb = { db, COL };

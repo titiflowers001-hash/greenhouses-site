@@ -105,6 +105,24 @@
   .money-pos{color:var(--dgreen);font-weight:700}
   .money-neg{color:var(--red);font-weight:700}
   .tbl-wrap{overflow-x:auto}
+  .b-tr{background:#e8f0ff;color:#2a5bd7}
+  .b-sale{background:#fff7d6;color:#8a6d00}
+  .pill{display:inline-block;background:var(--lgreen);border-radius:10px;padding:.1rem .45rem;margin:.1rem .15rem .1rem 0;font-size:.72rem;white-space:nowrap}
+  .pill.neg{background:#fff0e8;color:var(--red)}
+  .pill.gray{background:#f1f1f1;color:var(--muted)}
+  .seg{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.9rem}
+  .seg .chip{user-select:none}
+  .line{display:grid;grid-template-columns:2fr 1fr 70px 90px 30px;gap:.4rem;align-items:end;margin-bottom:.5rem;padding-bottom:.5rem;border-bottom:1px dashed var(--border)}
+  .line input,.line select{width:100%;padding:.45rem;border:2px solid var(--border);border-radius:4px;font-family:'Montserrat';font-size:.8rem}
+  .line .pick-q{margin-bottom:.25rem}
+  .calc{background:#faf8f5;border-radius:4px;padding:.6rem .8rem;font-size:.8rem;margin-bottom:.9rem}
+  .pick-q{width:100%;padding:.45rem .7rem;border:2px solid var(--border);border-radius:4px;font-family:'Montserrat';font-size:.8rem;margin-bottom:.3rem}
+  .sizes-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem}
+  .sizes-grid label{font-size:.66rem!important}
+  pre.fmt{background:#faf8f5;padding:.8rem;border-radius:4px;font-size:.75rem;overflow-x:auto;margin-bottom:.9rem;white-space:pre}
+  .hist{max-height:220px;overflow-y:auto;font-size:.76rem}
+  .hist div{padding:.25rem 0;border-bottom:1px solid var(--border)}
+  @media(max-width:640px){.line{grid-template-columns:1fr 1fr}.sizes-grid{grid-template-columns:repeat(2,1fr)}.f2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -126,7 +144,8 @@
     <div class="live" id="liveMark">база подключена, обновления в реальном времени</div>
   </div>
   <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-    <button class="btn" onclick="openImport()">Загрузить товары из JSON</button>
+    <button class="btn" onclick="openReset()">Обнулить базу</button>
+    <button class="btn" onclick="openImport()">Загрузить остатки (.txt)</button>
     <button class="btn primary" onclick="openProd()">+ Новая позиция</button>
     <button class="btn" onclick="logout()">Выйти</button>
   </div>
@@ -134,26 +153,33 @@
 
 <div class="tabs">
   <button class="tab active" data-t="stock" onclick="showTab('stock')">Склад</button>
+  <button class="tab" data-t="ops" onclick="showTab('ops')">Операции</button>
+  <button class="tab" data-t="orders" onclick="showTab('orders')">Продажи</button>
   <button class="tab" data-t="materials" onclick="showTab('materials')">Сырьё</button>
-  <button class="tab" data-t="orders" onclick="showTab('orders')">Заказы</button>
   <button class="tab" data-t="customers" onclick="showTab('customers')">Клиенты</button>
-  <button class="tab" data-t="moves" onclick="showTab('moves')">Приход / Списание</button>
   <button class="tab" data-t="expenses" onclick="showTab('expenses')">Расходы</button>
   <button class="tab" data-t="finance" onclick="showTab('finance')">Финансы</button>
 </div>
 
 <div class="wrap">
+  <div class="bar" id="opBar">
+    <button class="btn green" onclick="openOp('income')">+ Приход</button>
+    <button class="btn" onclick="openOp('transplant')">Пересадка</button>
+    <button class="btn" onclick="openOp('writeoff')">Списание</button>
+    <button class="btn primary" onclick="openOp('sale')">+ Продажа в магазине</button>
+  </div>
   <div id="pane-stock"></div>
-  <div id="pane-materials" style="display:none"></div>
+  <div id="pane-ops" style="display:none"></div>
   <div id="pane-orders" style="display:none"></div>
+  <div id="pane-materials" style="display:none"></div>
   <div id="pane-customers" style="display:none"></div>
-  <div id="pane-moves" style="display:none"></div>
   <div id="pane-expenses" style="display:none"></div>
   <div id="pane-finance" style="display:none"></div>
 </div>
 
 <div class="status" id="statusBar">Подключение к базе...</div>
 
+<!-- Карточка растения -->
 <div class="ov" id="ovProd"><div class="box">
   <h2 id="prodTitle">Новая позиция</h2>
   <div class="f"><label>Название сорта</label><input type="text" id="pName" placeholder="Опера F1 Blue"></div>
@@ -165,60 +191,52 @@
       <div class="newrow" id="rowNewTyp" style="display:none"><input type="text" id="pNewType" placeholder="Новая серия"><button class="btn small" onclick="addTyp()">ОК</button></div></div>
   </div>
   <div class="f"><label>Вид (можно несколько)</label><div class="chips" id="pVids"></div></div>
-  <div class="f"><label>Цены, тг (Маленький / Средний / Большой)</label>
-    <div class="f3"><input type="number" id="pP1"><input type="number" id="pP2"><input type="number" id="pP3"></div></div>
-  <div class="f"><label>Себестоимость, тг (для расчёта прибыли)</label>
-    <div class="f3"><input type="number" id="pC1"><input type="number" id="pC2"><input type="number" id="pC3"></div></div>
-  <div class="f"><label>Остатки, шт</label>
-    <div class="f3"><input type="number" id="pS1"><input type="number" id="pS2"><input type="number" id="pS3"></div></div>
-  <div class="f"><label>Ключ картинок</label><input type="text" id="pImg" placeholder="petunia_opera_blue">
-    <div class="hint">Файлы: КЛЮЧ_card.webp, КЛЮЧ_a1.webp, КЛЮЧ_a2.webp, КЛЮЧ_a3.webp</div></div>
+  <div class="f" style="display:flex;align-items:center;gap:.7rem">
+    <label class="sw"><input type="checkbox" id="pCass" onchange="drawPrices()"><span class="sl"></span></label>
+    <span style="font-size:.84rem;font-weight:600">Карточка «в кассетах» (рассада, считается поштучно)</span></div>
+  <div class="f"><label>Цены продажи, тг за 1 шт</label><div class="sizes-grid" id="pPrices"></div></div>
+  <div class="f"><label>Ключ картинки</label><input type="text" id="pImg" placeholder="petunia_opera_blue">
+    <div class="hint">Файл: images/КЛЮЧ_card.webp — одно фото на все размеры</div></div>
   <div class="f" style="display:flex;align-items:center;gap:.7rem">
     <label class="sw"><input type="checkbox" id="pActive" checked><span class="sl"></span></label>
     <span style="font-size:.84rem;font-weight:600">В продаже (виден на сайте)</span></div>
+  <div id="pStockBox" class="f"><label>Остатки (меняются только операциями)</label><div id="pStockView"></div></div>
+  <div id="pHistBox" class="f"><label>История товара</label><div class="hist" id="pHist"></div></div>
   <div class="acts"><button class="btn" onclick="closeOv('ovProd')">Отмена</button>
     <button class="btn primary" onclick="saveProd()">Сохранить</button></div>
 </div></div>
 
-<div class="ov" id="ovMove"><div class="box">
-  <h2 id="moveTitle">Приход товара</h2>
-  <div class="f"><label>Товар</label><select id="mProd"></select></div>
-  <div class="f2">
-    <div class="f"><label>Размер</label><select id="mSize">
-      <option value="a1">Маленький (стаканчик)</option><option value="a2">Средний (3 литра)</option><option value="a3">Большой (кашпо)</option>
-    </select></div>
-    <div class="f"><label>Количество, шт</label><input type="number" id="mQty" value="1" min="1"></div>
-  </div>
-  <div class="f" id="mCostWrap"><label>Себестоимость партии, тг (пойдёт в расходы)</label><input type="number" id="mCost" placeholder="0"></div>
-  <div class="f"><label>Комментарий</label><input type="text" id="mNote" placeholder="Партия от поставщика / брак"></div>
-  <div class="acts"><button class="btn" onclick="closeOv('ovMove')">Отмена</button>
-    <button class="btn primary" onclick="saveMove()">Сохранить</button></div>
+<!-- Операция: приход / пересадка / списание / продажа -->
+<div class="ov" id="ovOp"><div class="box" style="max-width:760px">
+  <h2 id="opTitle">Операция</h2>
+  <div id="opBody"></div>
+  <div class="acts"><button class="btn" onclick="closeOv('ovOp')">Отмена</button>
+    <button class="btn primary" id="opSaveBtn" onclick="saveOp()">Сохранить</button></div>
 </div></div>
 
+<!-- Сырьё -->
+<div class="ov" id="ovMat"><div class="box">
+  <h2 id="matTitle">Новое сырьё</h2>
+  <div class="f"><label>Название</label><input type="text" id="matName" placeholder="Земля универсальная / Горшок 0.2"></div>
+  <div class="f"><label>Вид сырья</label><select id="matKind" onchange="matKindChange()"></select>
+    <div class="hint" id="matUnitHint">Единица измерения: —</div></div>
+  <div class="f" id="matSizeBox"><label>Размер горшка</label><select id="matSize"></select>
+    <div class="hint">По нему горшок списывается автоматически при пересадке в этот размер</div></div>
+  <div class="note">Остаток меняется только операциями: «Приход», «Списание», «Пересадка».</div>
+  <div class="acts"><button class="btn" onclick="closeOv('ovMat')">Отмена</button>
+    <button class="btn primary" onclick="saveMat()">Сохранить</button></div>
+</div></div>
+
+<!-- Расход -->
 <div class="ov" id="ovExp"><div class="box">
   <h2>Новый расход</h2>
+  <div class="note">Закуп растений и сырья оформляй через «+ Приход» — сумма сама попадёт в расходы.</div>
   <div class="f2">
-    <div class="f"><label>Категория</label><select id="eCat" onchange="expCatChange()">
-      <optgroup label="Закуп сырья (пополнит склад сырья)">
-        <option value="Земля">Земля</option>
-        <option value="Удобрения">Удобрения</option>
-        <option value="Горшки">Горшки</option>
-        <option value="Покупной черенок">Покупной черенок</option>
-        <option value="Покупные семена">Покупные семена</option>
-      </optgroup>
-      <optgroup label="Прочие расходы">
-        <option>Закуп товара</option><option>Аренда</option><option>Зарплата</option><option>Транспорт</option>
-        <option>Реклама</option><option>Упаковка</option><option>Коммунальные</option><option>Прочее</option>
-      </optgroup>
+    <div class="f"><label>Категория</label><select id="eCat">
+      <option>Аренда</option><option>Зарплата</option><option>Транспорт</option><option>Реклама</option>
+      <option>Упаковка</option><option>Коммунальные</option><option>Прочее</option>
     </select></div>
     <div class="f"><label>Сумма, тг</label><input type="number" id="eSum"></div>
-  </div>
-  <div id="eMatBox">
-    <div class="f2">
-      <div class="f"><label>Название сырья</label><input type="text" id="eMatName" placeholder="Земля универсальная / Горшок 1л"></div>
-      <div class="f"><label>Количество (<span id="eMatUnit">—</span>)</label><input type="number" id="eMatQty" min="0" step="any"></div>
-    </div>
-    <div class="hint">Это сырьё добавится в остаток на складе сырья. Цена за единицу = сумма ÷ количество.</div>
   </div>
   <div class="f"><label>Дата</label><input type="date" id="eDate"></div>
   <div class="f"><label>Описание</label><input type="text" id="eNote" placeholder="За что потрачено"></div>
@@ -226,563 +244,50 @@
     <button class="btn primary" onclick="saveExp()">Сохранить</button></div>
 </div></div>
 
-<div class="ov" id="ovImp"><div class="box">
-  <h2>Загрузка товаров в базу</h2>
-  <div class="note">Нужно только один раз — при первом запуске. Загрузи файл <b>products.json</b>, и все позиции попадут в онлайн-базу. Дальше товары редактируются прямо здесь.</div>
-  <div class="f"><label>Файл products.json</label><input type="file" id="impFile" accept=".json"></div>
-  <div id="impLog" class="hint"></div>
+<!-- Загрузка остатков из .txt -->
+<div class="ov" id="ovImp"><div class="box" style="max-width:720px">
+  <h2>Загрузка стартовых остатков из .txt</h2>
+  <div class="note">Сначала нажми «Обнулить базу», потом загружай файл. Остатки из файла записываются как есть (не прибавляются).</div>
+  <div class="f"><label>Формат файла</label>
+<pre class="fmt"># РАСТЕНИЯ
+Название | размер | количество | цена за шт
+Аигуль | 0.2 | 15 | 1500
+Аигуль | 1 | 4 | 3500
+Аигуль | кассета | 112 | 300
+
+# ЗЕМЛЯ          (количество в литрах)
+Грунт универсальный | 500
+
+# УДОБРЕНИЯ      (в кг)
+Осмокот | 2
+
+# ГОРШКИ         (в шт, размер берётся из названия)
+Горшок 0.2 | 300
+Горшок 1 | 150
+
+# КАССЕТЫ        (пустые кассеты, в шт)
+Кассета 112 | 40</pre>
+    <div class="hint">Разделитель: | или ; или Tab. Размеры: кассета, 0.2, 0.5, 1, 3, 5, 7, 10. Строка «Аигуль | кассета» создаст отдельную карточку «Аигуль (кассета)». Название растения должно совпадать с карточкой на сайте — иначе создастся новая карточка в группе «Новые из файла».</div></div>
+  <div class="f"><label>Файл .txt</label><input type="file" id="impFile" accept=".txt,text/plain"></div>
+  <div id="impPreview" class="hint"></div>
   <div class="acts"><button class="btn" onclick="closeOv('ovImp')">Закрыть</button>
-    <button class="btn green" onclick="runImport()">Загрузить в базу</button></div>
+    <button class="btn" onclick="checkImport()">Проверить файл</button>
+    <button class="btn green" id="impGo" disabled onclick="runImport()">Записать в базу</button></div>
 </div></div>
 
-<div class="ov" id="ovMat"><div class="box">
-  <h2 id="matTitle">Новое сырьё</h2>
-  <div class="f"><label>Название</label><input type="text" id="matName" placeholder="Земля универсальная / Горшок 1л"></div>
-  <div class="f"><label>Вид сырья</label><select id="matKind" onchange="matUnitHint()"></select>
-    <div class="hint" id="matUnitHint">Единица измерения: —</div></div>
-  <div class="note">Остаток и цену за единицу задаёт «Приход сырья» — здесь только название и вид.</div>
-  <div class="acts"><button class="btn" onclick="closeOv('ovMat')">Отмена</button>
-    <button class="btn primary" onclick="saveMat()">Сохранить</button></div>
-</div></div>
-
-<div class="ov" id="ovMatIn"><div class="box">
-  <h2>Приход сырья</h2>
-  <div class="f"><label>Сырьё</label><select id="miMat"></select></div>
-  <div class="f2">
-    <div class="f"><label>Количество (<span id="miUnit">—</span>)</label><input type="number" id="miQty" min="0" step="any"></div>
-    <div class="f"><label>Сумма закупа, тг</label><input type="number" id="miCost" min="0" placeholder="0"></div>
-  </div>
-  <div class="hint">Цена за единицу посчитается сама: сумма ÷ количество (с усреднением по остатку). Сумма закупа уйдёт в «Расходы».</div>
-  <div class="f"><label>Комментарий</label><input type="text" id="miNote" placeholder="Поставщик / партия"></div>
-  <div class="acts"><button class="btn" onclick="closeOv('ovMatIn')">Отмена</button>
-    <button class="btn primary" onclick="saveMatIn()">Оприходовать</button></div>
+<!-- Обнуление -->
+<div class="ov" id="ovReset"><div class="box">
+  <h2>Обнулить базу</h2>
+  <div class="note" style="border-color:var(--red);background:#fff0e8">Будут <b>удалены навсегда</b>: все операции, продажи и заказы, клиенты, расходы и всё сырьё.<br>
+  Карточки растений (названия, фото, описания) <b>останутся</b>, но их остатки, цены и себестоимость станут пустыми.</div>
+  <div class="f"><label>Чтобы подтвердить, напиши слово УДАЛИТЬ</label><input type="text" id="resetWord"></div>
+  <div id="resetLog" class="hint"></div>
+  <div class="acts"><button class="btn" onclick="closeOv('ovReset')">Отмена</button>
+    <button class="btn primary" onclick="runReset()">Обнулить</button></div>
 </div></div>
 
 <script src="firebase-config.js"></script>
 <script src="db.js"></script>
-<script>
-let PRODUCTS = [], ORDERS = [], CUSTOMERS = [], EXPENSES = [], MOVES = [], MATERIALS = [];
-let curTab = 'stock', grpFilter = 'all', editId = null, moveType = 'income';
-const VIDS = ['Ампельные','Каскадные','Кустовые','Межвидовые','Многолетние'];
-const SZ = { a1:'Маленький', a2:'Средний', a3:'Большой' };
-
-const AUTH = firebase.auth();
-let _booted = false;
-function tryLogin(){
-  const email = document.getElementById('email').value.trim();
-  const pw = document.getElementById('pw').value;
-  document.getElementById('pwErr').style.display='none';
-  AUTH.signInWithEmailAndPassword(email, pw)
-    .catch(function(e){ document.getElementById('pwErr').style.display='block'; });
-}
-function logout(){ AUTH.signOut(); }
-// Firebase сам помнит вход между сессиями. Показываем админку только
-// вошедшему, а при выходе — снова экран входа.
-AUTH.onAuthStateChanged(function(user){
-  if (user){
-    document.getElementById('gate').style.display='none';
-    if(!_booted){ _booted = true; boot(); }
-  } else {
-    document.getElementById('gate').style.display='flex';
-  }
-});
-
-function setStatus(m,warn){ const s=document.getElementById('statusBar'); s.innerHTML=m; s.style.color=warn?'var(--red)':''; }
-
-function boot(){
-  try{
-    DB.watchProducts(list=>{
-      PRODUCTS = list.sort((a,b)=>String(a.group||'').localeCompare(String(b.group||''))||(a.id-b.id));
-      if(curTab==='stock') renderStock();
-      if(curTab==='finance') renderFinance();
-    });
-    reloadAll();
-    setStatus('База подключена. Остатки спишутся после подтверждения заказа.');
-  }catch(e){ setStatus('Ошибка подключения: '+e.message, true); }
-}
-
-async function reloadAll(){
-  try{
-    const res = await Promise.all([DB.getOrders(), DB.getCustomers(), DB.getExpenses(), DB.getMoves(), DB.getMaterials()]);
-    ORDERS=res[0]; CUSTOMERS=res[1]; EXPENSES=res[2]; MOVES=res[3]; MATERIALS=res[4];
-    renderTab();
-  }catch(e){ setStatus('Ошибка базы: '+e.message, true); }
-}
-
-function showTab(t){
-  curTab=t;
-  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
-  ['stock','materials','orders','customers','moves','expenses','finance'].forEach(x=>{
-    document.getElementById('pane-'+x).style.display = x===t?'block':'none';
-  });
-  renderTab();
-}
-function renderTab(){
-  const map={stock:renderStock, materials:renderMaterials, orders:renderOrders, customers:renderCustomers,
-    moves:renderMoves, expenses:renderExpenses, finance:renderFinance};
-  map[curTab]();
-}
-
-const fmt = n => (n||0).toLocaleString('ru-RU') + ' тг';
-const dt = ts => ts && ts.toDate ? ts.toDate().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '-';
-
-/* ================= СЫРЬЁ (материалы) ================= */
-const MAT_KINDS = [
-  {k:'soil',       name:'Земля',     unit:'л'},
-  {k:'fertilizer', name:'Удобрение', unit:'кг'},
-  {k:'pot',        name:'Горшок',    unit:'шт'},
-  {k:'cutting',    name:'Черенок',   unit:'шт'},
-  {k:'seed',       name:'Семена',    unit:'упак'}
-];
-const MAT_UNIT  = k => (MAT_KINDS.find(x=>x.k===k)||{}).unit || '';
-const MAT_KNAME = k => (MAT_KINDS.find(x=>x.k===k)||{}).name || k;
-let matEditId = null;
-
-function renderMaterials(){
-  const totalVal = MATERIALS.reduce((n,m)=>n+(m.stock||0)*(m.avgCost||0),0);
-  document.getElementById('pane-materials').innerHTML=
-    '<div class="stats">'+
-      '<div class="stat"><div class="num">'+MATERIALS.length+'</div><div class="lbl">Видов сырья</div></div>'+
-      '<div class="stat good"><div class="num">'+fmt(totalVal)+'</div><div class="lbl">Стоимость сырья на складе</div></div>'+
-    '</div>'+
-    '<div class="note">Сырьё появляется здесь само, когда ты записываешь закуп во вкладке «Расходы» (категории: земля, удобрения, горшки, черенки, семена).</div>'+
-    '<div class="tbl-wrap"><table><thead><tr><th>Название</th><th>Вид</th><th>Доступно</th><th>Цена за ед.</th><th>Стоимость</th><th></th></tr></thead><tbody>'+
-    (MATERIALS.length?MATERIALS.map(function(m){
-      const low=(m.stock||0)<=0;
-      return '<tr><td><b>'+(m.name||'-')+'</b></td>'+
-        '<td>'+MAT_KNAME(m.kind)+'</td>'+
-        '<td><b'+(low?' style="color:var(--red)"':'')+'>'+(m.stock||0)+'</b> '+MAT_UNIT(m.kind)+'</td>'+
-        '<td>'+fmt(m.avgCost||0)+'</td>'+
-        '<td>'+fmt((m.stock||0)*(m.avgCost||0))+'</td>'+
-        '<td><button class="icon-btn" title="Удалить (для исправлений)" onclick="delMat(\''+m._docId+'\')">x</button></td></tr>';
-    }).join(''):'<tr><td colspan="6" class="empty">Сырья пока нет. Нажми «+ Новое сырьё».</td></tr>')+
-    '</tbody></table></div>';
-}
-
-function fillMatKinds(sel, val){
-  sel.innerHTML = MAT_KINDS.map(x=>'<option value="'+x.k+'"'+(x.k===val?' selected':'')+'>'+x.name+' ('+x.unit+')</option>').join('');
-}
-function matUnitHint(){
-  document.getElementById('matUnitHint').textContent='Единица измерения: '+MAT_UNIT(document.getElementById('matKind').value);
-}
-function openMat(docId){
-  matEditId = docId || null;
-  const m = docId ? MATERIALS.find(x=>x._docId===docId) : null;
-  document.getElementById('matTitle').textContent = m?'Редактировать сырьё':'Новое сырьё';
-  document.getElementById('matName').value = m?(m.name||''):'';
-  fillMatKinds(document.getElementById('matKind'), m?m.kind:'soil');
-  matUnitHint();
-  document.getElementById('ovMat').classList.add('open');
-}
-async function saveMat(){
-  const name=document.getElementById('matName').value.trim();
-  const kind=document.getElementById('matKind').value;
-  if(!name){ alert('Введите название'); return; }
-  const data={ name:name, kind:kind };
-  if(matEditId) data._docId=matEditId;
-  try{ await DB.saveMaterial(data); closeOv('ovMat'); await reloadAll(); setStatus('Сырьё сохранено'); }
-  catch(e){ setStatus('Ошибка: '+e.message, true); alert('Ошибка: '+e.message); }
-}
-async function delMat(docId){
-  const m=MATERIALS.find(x=>x._docId===docId);
-  if(!confirm('Удалить «'+(m?m.name:'')+'» из сырья?')) return;
-  try{ await DB.deleteMaterial(docId); await reloadAll(); setStatus('Сырьё удалено'); }
-  catch(e){ setStatus('Ошибка: '+e.message, true); }
-}
-function openMatIn(docId){
-  if(!MATERIALS.length){ alert('Сначала добавь хотя бы одно сырьё'); return; }
-  const sel=document.getElementById('miMat');
-  sel.innerHTML=MATERIALS.map(m=>'<option value="'+m._docId+'">'+m.name+' ('+MAT_KNAME(m.kind)+')</option>').join('');
-  if(docId) sel.value=docId;
-  sel.onchange=miUnitHint; miUnitHint();
-  document.getElementById('miQty').value='';
-  document.getElementById('miCost').value='';
-  document.getElementById('miNote').value='';
-  document.getElementById('ovMatIn').classList.add('open');
-}
-function miUnitHint(){
-  const m=MATERIALS.find(x=>x._docId===document.getElementById('miMat').value);
-  document.getElementById('miUnit').textContent=m?MAT_UNIT(m.kind):'—';
-}
-async function saveMatIn(){
-  const id=document.getElementById('miMat').value;
-  const qty=parseFloat(document.getElementById('miQty').value)||0;
-  const cost=parseInt(document.getElementById('miCost').value)||0;
-  const note=document.getElementById('miNote').value.trim();
-  if(qty<=0){ alert('Укажите количество'); return; }
-  try{ await DB.receiveMaterial(id, qty, cost, note); closeOv('ovMatIn'); await reloadAll(); setStatus('Приход оприходован, остаток пополнен, сумма ушла в расходы'); }
-  catch(e){ setStatus('Ошибка: '+e.message, true); alert('Ошибка: '+e.message); }
-}
-/* ============== конец блока «Сырьё» ============== */
-
-function renderStock(){
-  const groups=[...new Set(PRODUCTS.map(p=>p.group))].filter(Boolean).sort();
-  const total=PRODUCTS.length, active=PRODUCTS.filter(p=>p.active!==false).length;
-  const out=PRODUCTS.filter(p=>{const s=p.stock||{};return !(s.a1>0||s.a2>0||s.a3>0)}).length;
-  const stockValue=PRODUCTS.reduce((n,p)=>{const s=p.stock||{};return n+['a1','a2','a3'].reduce((m,k)=>m+(s[k]||0)*((p.price&&p.price[k])||0),0)},0);
-
-  let list=PRODUCTS.filter(p=>grpFilter==='all'||p.group===grpFilter);
-  const _sEl=document.getElementById('sSearch');
-  const q=(_sEl?_sEl.value:'').toLowerCase();
-  const _sFocused=(document.activeElement===_sEl && !!_sEl);
-  const _sCaret=_sFocused?_sEl.selectionStart:null;
-  if(q) list=list.filter(p=>String(p.name).toLowerCase().includes(q));
-
-  document.getElementById('pane-stock').innerHTML=
-    '<div class="stats">'+
-      '<div class="stat"><div class="num">'+total+'</div><div class="lbl">Позиций</div></div>'+
-      '<div class="stat good"><div class="num">'+active+'</div><div class="lbl">В продаже</div></div>'+
-      '<div class="stat warn"><div class="num">'+out+'</div><div class="lbl">Нет в наличии</div></div>'+
-      '<div class="stat"><div class="num">'+fmt(stockValue)+'</div><div class="lbl">Стоимость склада</div></div>'+
-    '</div>'+
-    '<div class="bar">'+
-      '<input type="text" id="sSearch" placeholder="Поиск по названию..." value="'+q+'" oninput="renderStock()">'+
-      '<select onchange="grpFilter=this.value;renderStock()"><option value="all">Все группы</option>'+
-      groups.map(g=>'<option '+(grpFilter===g?'selected':'')+'>'+g+'</option>').join('')+'</select>'+
-      '<button class="btn green small" onclick="openMove(\'income\')">Приход</button>'+
-      '<button class="btn small" onclick="openMove(\'writeoff\')">Списать</button>'+
-    '</div>'+
-    '<div class="tbl-wrap"><table><thead><tr><th></th><th>Название</th><th>Группа / серия</th>'+
-    '<th>Остатки М / С / Б</th><th>Цены тг</th><th>Продажа</th><th></th></tr></thead><tbody>'+
-    (list.length?list.map(function(p){
-      const s=p.stock||{a1:0,a2:0,a3:0}, on=p.active!==false;
-      const img=p.image_card?'<img class="thumb" src="'+p.image_card+'" onerror="this.outerHTML=\'<div class=&quot;thumb-ph&quot;>*</div>\'">':'<div class="thumb-ph">*</div>';
-      return '<tr class="'+(on?'':'off')+'"><td>'+img+'</td>'+
-        '<td><b>'+p.name+'</b>'+(p.desc?'<div class="sub">'+p.desc+'</div>':'')+'</td>'+
-        '<td>'+p.group+'<div class="sub">'+(p.type||'')+'</div></td>'+
-        '<td><div class="row-flex">'+['a1','a2','a3'].map(k=>
-          '<input class="num-in '+((s[k]||0)<=0?'zero':'')+'" type="number" min="0" value="'+(s[k]||0)+'" onchange="chStock('+p.id+',\''+k+'\',this.value)">').join('')+'</div></td>'+
-        '<td><div class="row-flex">'+['a1','a2','a3'].map(k=>
-          '<input class="price-in" type="number" value="'+((p.price&&p.price[k])||0)+'" onchange="chPrice('+p.id+',\''+k+'\',this.value)">').join('')+'</div></td>'+
-        '<td><label class="sw"><input type="checkbox" '+(on?'checked':'')+' onchange="chActive('+p.id+',this.checked)"><span class="sl"></span></label></td>'+
-        '<td><div class="row-flex"><button class="icon-btn" onclick="openProd('+p.id+')">e</button>'+
-        '<button class="icon-btn" onclick="delProd('+p.id+')">x</button></div></td></tr>';
-    }).join(''):'<tr><td colspan="7" class="empty">Пусто. Если база новая — нажми «Загрузить товары из JSON» вверху.</td></tr>')+
-    '</tbody></table></div>';
-  if(_sFocused){
-    const el=document.getElementById('sSearch');
-    if(el){ el.focus(); try{ el.setSelectionRange(_sCaret, _sCaret); }catch(e){} }
-  }
-}
-async function chStock(id,k,v){ await DB.setStock(id,k,parseInt(v)||0); setStatus('Остаток обновлён — на сайте уже видно'); }
-async function chPrice(id,k,v){
-  const p=PRODUCTS.find(x=>x.id===id)||{};
-  const price=Object.assign({},p.price||{}); price[k]=parseInt(v)||0;
-  await DB.saveProduct({id:id, price:price}); setStatus('Цена обновлена');
-}
-async function chActive(id,on){ await DB.setActive(id,on); setStatus(on?'Позиция снова в продаже':'Позиция скрыта с сайта'); }
-async function delProd(id){
-  const p=PRODUCTS.find(x=>x.id===id);
-  if(!confirm('Удалить «'+p.name+'» из базы навсегда?\n\nЕсли товар просто закончился — лучше выключить переключатель «Продажа».'))return;
-  await DB.deleteProduct(id); setStatus('Позиция удалена');
-}
-
-function renderOrders(){
-  const sum=ORDERS.filter(o=>o.status!=='cancel').reduce((n,o)=>n+(o.total||0),0);
-  const nw=ORDERS.filter(o=>o.status==='new').length;
-  document.getElementById('pane-orders').innerHTML=
-    '<div class="stats">'+
-      '<div class="stat"><div class="num">'+ORDERS.length+'</div><div class="lbl">Всего заказов</div></div>'+
-      '<div class="stat warn"><div class="num">'+nw+'</div><div class="lbl">Новые</div></div>'+
-      '<div class="stat good"><div class="num">'+fmt(sum)+'</div><div class="lbl">Сумма продаж</div></div>'+
-    '</div>'+
-    '<div class="tbl-wrap"><table><thead><tr><th>Дата</th><th>Клиент</th><th>Состав</th><th>Сумма</th><th>Статус</th><th></th></tr></thead><tbody>'+
-    (ORDERS.length?ORDERS.map(function(o){
-      const items=(o.items||[]).map(i=>i.name+' · '+(SZ[i.size]||i.size)+' x '+i.qty).join('<br>');
-      const b=o.status==='new'?'b-new':o.status==='done'?'b-done':'b-cancel';
-      const t=o.status==='new'?'Новый':o.status==='done'?'Выполнен':'Отменён';
-      return '<tr><td>'+dt(o.createdAt)+'</td>'+
-        '<td><b>'+(o.name||'-')+'</b><div class="sub">'+(o.phone||'')+'</div></td>'+
-        '<td class="sub">'+items+'</td><td><b>'+fmt(o.total)+'</b></td>'+
-        '<td><span class="badge '+b+'">'+t+'</span></td><td><div class="row-flex">'+
-        (o.status!=='done'?'<button class="btn small green" onclick="confirmOrder(\''+o._docId+'\')">Подтвердить</button>':'')+
-        (o.status!=='cancel'?'<button class="btn small" onclick="ordStatus(\''+o._docId+'\',\'cancel\')">Отмена</button>':'')+
-        '</div></td></tr>';
-    }).join(''):'<tr><td colspan="6" class="empty">Заказов пока нет</td></tr>')+
-    '</tbody></table></div>';
-}
-async function ordStatus(id,st){ await DB.setOrderStatus(id,st); await reloadAll(); setStatus('Статус заказа обновлён'); }
-async function confirmOrder(id){
-  if(!confirm('Подтвердить заказ? Со склада спишутся товары из этого заказа.')) return;
-  try{
-    await DB.confirmOrder(id);
-    await reloadAll();
-    setStatus('Заказ подтверждён — склад списан');
-  }catch(e){
-    setStatus('Не удалось подтвердить: '+e.message, true);
-    alert('Ошибка: '+e.message);
-  }
-}
-
-function renderCustomers(){
-  const tot=CUSTOMERS.reduce((n,c)=>n+(c.totalSpent||0),0);
-  const avg=CUSTOMERS.length?Math.round(tot/CUSTOMERS.length):0;
-  document.getElementById('pane-customers').innerHTML=
-    '<div class="stats">'+
-      '<div class="stat"><div class="num">'+CUSTOMERS.length+'</div><div class="lbl">Клиентов в базе</div></div>'+
-      '<div class="stat good"><div class="num">'+fmt(tot)+'</div><div class="lbl">Купили на сумму</div></div>'+
-      '<div class="stat"><div class="num">'+fmt(avg)+'</div><div class="lbl">Средний чек клиента</div></div>'+
-    '</div>'+
-    '<div class="note">Контакты собираются автоматически из заказов — телефон служит уникальным ключом.</div>'+
-    '<div class="tbl-wrap"><table><thead><tr><th>Имя</th><th>Телефон</th><th>Email</th><th>Адрес</th><th>Заказов</th><th>На сумму</th><th>Последний</th></tr></thead><tbody>'+
-    (CUSTOMERS.length?CUSTOMERS.map(c=>'<tr><td><b>'+(c.name||'-')+'</b></td><td>'+(c.phone||'')+'</td>'+
-      '<td class="sub">'+(c.email||'-')+'</td><td class="sub">'+(c.address||'-')+'</td>'+
-      '<td>'+(c.ordersCount||0)+'</td><td><b>'+fmt(c.totalSpent)+'</b></td><td class="sub">'+dt(c.lastOrderAt)+'</td></tr>').join('')
-      :'<tr><td colspan="7" class="empty">Клиентов пока нет</td></tr>')+
-    '</tbody></table></div>';
-}
-
-function renderMoves(){
-  const inc=MOVES.filter(m=>m.type==='income').reduce((n,m)=>n+(m.qty||0),0);
-  const sold=MOVES.filter(m=>m.type==='sale').reduce((n,m)=>n+Math.abs(m.qty||0),0);
-  const off=MOVES.filter(m=>m.type==='writeoff').reduce((n,m)=>n+Math.abs(m.qty||0),0);
-  document.getElementById('pane-moves').innerHTML=
-    '<div class="stats">'+
-      '<div class="stat good"><div class="num">+'+inc+'</div><div class="lbl">Приход, шт</div></div>'+
-      '<div class="stat"><div class="num">-'+sold+'</div><div class="lbl">Продано, шт</div></div>'+
-      '<div class="stat warn"><div class="num">-'+off+'</div><div class="lbl">Списано, шт</div></div>'+
-    '</div>'+
-    '<div class="bar"><button class="btn green" onclick="openMove(\'income\')">Оформить приход</button>'+
-    '<button class="btn" onclick="openMove(\'writeoff\')">Списать (брак, потери)</button></div>'+
-    '<div class="tbl-wrap"><table><thead><tr><th>Дата</th><th>Тип</th><th>Товар</th><th>Размер</th><th>Кол-во</th><th>Комментарий</th></tr></thead><tbody>'+
-    (MOVES.length?MOVES.map(function(m){
-      const b=m.type==='income'?'b-done':m.type==='sale'?'b-cancel':'b-new';
-      const t=m.type==='income'?'Приход':m.type==='sale'?'Продажа':'Списание';
-      return '<tr><td>'+dt(m.createdAt)+'</td><td><span class="badge '+b+'">'+t+'</span></td>'+
-        '<td>'+(m.name||'')+'</td><td class="sub">'+(SZ[m.size]||m.size||'')+'</td>'+
-        '<td class="'+((m.qty||0)>0?'money-pos':'money-neg')+'">'+((m.qty||0)>0?'+':'')+m.qty+'</td>'+
-        '<td class="sub">'+(m.note||'')+'</td></tr>';
-    }).join(''):'<tr><td colspan="6" class="empty">Движений пока нет</td></tr>')+
-    '</tbody></table></div>';
-}
-
-function renderExpenses(){
-  const tot=EXPENSES.reduce((n,e)=>n+(e.sum||0),0);
-  const byCat={}; EXPENSES.forEach(e=>{byCat[e.cat]=(byCat[e.cat]||0)+(e.sum||0)});
-  const top=Object.entries(byCat).sort((a,b)=>b[1]-a[1])[0];
-  document.getElementById('pane-expenses').innerHTML=
-    '<div class="stats">'+
-      '<div class="stat warn"><div class="num">'+fmt(tot)+'</div><div class="lbl">Всего расходов</div></div>'+
-      '<div class="stat"><div class="num">'+EXPENSES.length+'</div><div class="lbl">Записей</div></div>'+
-      '<div class="stat"><div class="num" style="font-size:1rem">'+(top?top[0]:'-')+'</div><div class="lbl">Главная статья '+(top?'· '+fmt(top[1]):'')+'</div></div>'+
-    '</div>'+
-    '<div class="bar"><button class="btn primary" onclick="openExp()">+ Добавить расход</button></div>'+
-    '<div class="tbl-wrap"><table><thead><tr><th>Дата</th><th>Категория</th><th>Описание</th><th>Сумма</th><th></th></tr></thead><tbody>'+
-    (EXPENSES.length?EXPENSES.map(e=>'<tr><td>'+(e.date||dt(e.createdAt))+'</td><td><b>'+e.cat+'</b></td>'+
-      '<td class="sub">'+(e.note||'')+'</td><td class="money-neg">-'+fmt(e.sum)+'</td>'+
-      '<td><button class="icon-btn" onclick="delExp(\''+e._docId+'\')">x</button></td></tr>').join('')
-      :'<tr><td colspan="5" class="empty">Расходов пока нет</td></tr>')+
-    '</tbody></table></div>';
-}
-async function delExp(id){ if(!confirm('Удалить запись о расходе?'))return; await DB.deleteExpense(id); await reloadAll(); }
-
-function renderFinance(){
-  const revenue=ORDERS.filter(o=>o.status!=='cancel').reduce((n,o)=>n+(o.total||0),0);
-  const spent=EXPENSES.reduce((n,e)=>n+(e.sum||0),0);
-  const profit=revenue-spent;
-  const stockVal=PRODUCTS.reduce(function(n,p){const s=p.stock||{};
-    return n+['a1','a2','a3'].reduce((m,k)=>m+(s[k]||0)*((p.price&&p.price[k])||0),0)},0);
-  const done=ORDERS.filter(o=>o.status==='done').length;
-  const paid=ORDERS.filter(o=>o.status!=='cancel').length;
-  const avg=paid?Math.round(revenue/paid):0;
-
-  const months={};
-  ORDERS.filter(o=>o.status!=='cancel'&&o.createdAt&&o.createdAt.toDate).forEach(function(o){
-    const d=o.createdAt.toDate(), k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    months[k]=months[k]||{rev:0,exp:0}; months[k].rev+=o.total||0;
-  });
-  EXPENSES.forEach(function(e){
-    const d=(e.createdAt&&e.createdAt.toDate)?e.createdAt.toDate():(e.date?new Date(e.date):null); if(!d)return;
-    const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    months[k]=months[k]||{rev:0,exp:0}; months[k].exp+=e.sum||0;
-  });
-  const rows=Object.entries(months).sort((a,b)=>b[0].localeCompare(a[0]));
-  const NM=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-
-  document.getElementById('pane-finance').innerHTML=
-    '<div class="stats">'+
-      '<div class="stat good"><div class="num">'+fmt(revenue)+'</div><div class="lbl">Выручка</div></div>'+
-      '<div class="stat warn"><div class="num">'+fmt(spent)+'</div><div class="lbl">Расходы</div></div>'+
-      '<div class="stat"><div class="num '+(profit>=0?'money-pos':'money-neg')+'">'+fmt(profit)+'</div><div class="lbl">Прибыль</div></div>'+
-      '<div class="stat"><div class="num">'+fmt(stockVal)+'</div><div class="lbl">Товара на складе</div></div>'+
-    '</div>'+
-    '<div class="stats">'+
-      '<div class="stat"><div class="num">'+ORDERS.length+'</div><div class="lbl">Заказов всего</div></div>'+
-      '<div class="stat"><div class="num">'+done+'</div><div class="lbl">Выполнено</div></div>'+
-      '<div class="stat"><div class="num">'+fmt(avg)+'</div><div class="lbl">Средний чек</div></div>'+
-      '<div class="stat"><div class="num">'+CUSTOMERS.length+'</div><div class="lbl">Клиентов</div></div>'+
-    '</div>'+
-    '<h3 style="font-size:.9rem;margin:1.2rem 0 .6rem">По месяцам</h3>'+
-    '<div class="tbl-wrap"><table><thead><tr><th>Месяц</th><th>Выручка</th><th>Расходы</th><th>Прибыль</th></tr></thead><tbody>'+
-    (rows.length?rows.map(function(r){
-      const parts=r[0].split('-'), v=r[1], p=v.rev-v.exp;
-      return '<tr><td><b>'+NM[+parts[1]-1]+' '+parts[0]+'</b></td>'+
-        '<td class="money-pos">'+fmt(v.rev)+'</td><td class="money-neg">'+fmt(v.exp)+'</td>'+
-        '<td class="'+(p>=0?'money-pos':'money-neg')+'"><b>'+fmt(p)+'</b></td></tr>';
-    }).join(''):'<tr><td colspan="4" class="empty">Пока нет данных</td></tr>')+
-    '</tbody></table></div>';
-}
-
-function closeOv(id){ document.getElementById(id).classList.remove('open'); }
-
-function grpList(){ return [...new Set(PRODUCTS.map(p=>p.group))].filter(Boolean).sort(); }
-function typList(g){ return [...new Set(PRODUCTS.filter(p=>p.group===g).map(p=>p.type))].filter(Boolean).sort(); }
-function fillGrp(sel){
-  const el=document.getElementById('pGroup'), gs=grpList();
-  el.innerHTML=gs.map(g=>'<option>'+g+'</option>').join('')+'<option value="__new__">+ Новая группа...</option>';
-  el.value = gs.indexOf(sel)>-1?sel:(gs[0]||'__new__'); onGrp();
-}
-function onGrp(){
-  const v=document.getElementById('pGroup').value;
-  document.getElementById('rowNewGrp').style.display = v==='__new__'?'flex':'none';
-  fillTyp(v==='__new__'?null:v);
-}
-function addGrp(){
-  const n=document.getElementById('pNewGroup').value.trim(); if(!n){alert('Введите название');return;}
-  const el=document.getElementById('pGroup'), o=document.createElement('option'); o.value=n; o.textContent=n;
-  el.insertBefore(o, el.lastElementChild); el.value=n;
-  document.getElementById('rowNewGrp').style.display='none'; fillTyp(n);
-}
-function fillTyp(g,sel){
-  const el=document.getElementById('pType'), ts=g?typList(g):[];
-  el.innerHTML=ts.map(t=>'<option>'+t+'</option>').join('')+'<option value="__new__">+ Новая серия...</option>';
-  el.value = ts.indexOf(sel)>-1?sel:(ts[0]||'__new__'); onTyp();
-}
-function onTyp(){ document.getElementById('rowNewTyp').style.display=document.getElementById('pType').value==='__new__'?'flex':'none'; }
-function addTyp(){
-  const n=document.getElementById('pNewType').value.trim(); if(!n){alert('Введите название');return;}
-  const el=document.getElementById('pType'), o=document.createElement('option'); o.value=n; o.textContent=n;
-  el.insertBefore(o, el.lastElementChild); el.value=n;
-  document.getElementById('rowNewTyp').style.display='none';
-}
-function drawVids(sel){
-  sel=sel||[];
-  document.getElementById('pVids').innerHTML=VIDS.map(v=>
-    '<div class="chip '+(sel.indexOf(v)>-1?'on':'')+'" data-v="'+v+'" onclick="this.classList.toggle(\'on\')">'+v+'</div>').join('');
-}
-function openProd(id){
-  editId = (id===undefined||id===null)?null:id;
-  const p = editId!==null ? PRODUCTS.find(x=>x.id===editId) : null;
-  document.getElementById('prodTitle').textContent = p?'Редактировать позицию':'Новая позиция';
-  document.getElementById('pName').value=p?p.name:'';
-  document.getElementById('pDesc').value=(p&&p.desc)||'';
-  ['1','2','3'].forEach(function(n,i){
-    const k='a'+(i+1);
-    document.getElementById('pP'+n).value=(p&&p.price&&p.price[k])||'';
-    document.getElementById('pC'+n).value=(p&&p.cost&&p.cost[k])||'';
-    document.getElementById('pS'+n).value=(p&&p.stock&&p.stock[k])||0;
-  });
-  document.getElementById('pImg').value=((p&&p.image_card)||'').replace('images/','').replace('_card.webp','');
-  document.getElementById('pActive').checked = p ? p.active!==false : true;
-  fillGrp(p?p.group:(grpFilter!=='all'?grpFilter:null));
-  if(p){ document.getElementById('pGroup').value=p.group; onGrp(); fillTyp(p.group,p.type); }
-  drawVids(p?p.vid:[]);
-  document.getElementById('ovProd').classList.add('open');
-}
-async function saveProd(){
-  const name=document.getElementById('pName').value.trim(); if(!name){alert('Введите название');return;}
-  let g=document.getElementById('pGroup').value; if(g==='__new__')g=document.getElementById('pNewGroup').value.trim();
-  let t=document.getElementById('pType').value; if(t==='__new__')t=document.getElementById('pNewType').value.trim();
-  if(!g){alert('Укажите группу');return;} if(!t){alert('Укажите серию');return;}
-  const key=document.getElementById('pImg').value.trim()||('plant_'+Date.now());
-  const num=id=>parseInt(document.getElementById(id).value)||0;
-  const data={
-    id: editId!==null ? editId : (PRODUCTS.length?Math.max.apply(null,PRODUCTS.map(p=>p.id))+1:1),
-    name:name, desc:document.getElementById('pDesc').value.trim(), group:g, type:t,
-    vid:[].slice.call(document.querySelectorAll('#pVids .chip.on')).map(e=>e.dataset.v),
-    image_card:'images/'+key+'_card.webp', image_a1:'images/'+key+'_a1.webp',
-    image_a2:'images/'+key+'_a2.webp', image_a3:'images/'+key+'_a3.webp',
-    price:{a1:num('pP1'),a2:num('pP2'),a3:num('pP3')},
-    cost:{a1:num('pC1'),a2:num('pC2'),a3:num('pC3')},
-    stock:{a1:num('pS1'),a2:num('pS2'),a3:num('pS3')},
-    active:document.getElementById('pActive').checked
-  };
-  await DB.saveProduct(data);
-  closeOv('ovProd'); setStatus('Сохранено — изменения уже на сайте');
-}
-
-function openMove(type){
-  moveType=type;
-  document.getElementById('moveTitle').textContent = type==='income'?'Приход товара':'Списание товара';
-  document.getElementById('mCostWrap').style.display = type==='income'?'block':'none';
-  document.getElementById('mProd').innerHTML=PRODUCTS.map(p=>'<option value="'+p.id+'">'+p.name+' ('+p.group+')</option>').join('');
-  document.getElementById('mQty').value=1;
-  document.getElementById('mNote').value='';
-  document.getElementById('mCost').value='';
-  document.getElementById('ovMove').classList.add('open');
-}
-async function saveMove(){
-  const pid=parseInt(document.getElementById('mProd').value);
-  const p=PRODUCTS.find(x=>x.id===pid); if(!p){alert('Выберите товар');return;}
-  const size=document.getElementById('mSize').value;
-  let qty=parseInt(document.getElementById('mQty').value)||0; if(qty<=0){alert('Укажите количество');return;}
-  if(moveType==='writeoff')qty=-qty;
-  try{
-    await DB.addStockMove({type:moveType,plantId:pid,name:p.name,size:size,qty:qty,
-      note:document.getElementById('mNote').value.trim()});
-    const cost=parseInt(document.getElementById('mCost').value)||0;
-    if(moveType==='income'&&cost>0){
-      await DB.addExpense({cat:'Закуп товара',sum:cost,date:new Date().toISOString().slice(0,10),
-        note:p.name+' · '+SZ[size]+' x '+Math.abs(qty)+' шт'});
-    }
-    closeOv('ovMove'); await reloadAll();
-    setStatus(moveType==='income'?'Приход оформлен, остаток пополнен':'Товар списан');
-  }catch(e){ alert('Ошибка: '+e.message); }
-}
-
-const EXP_MAT = { 'Земля':'soil', 'Удобрения':'fertilizer', 'Горшки':'pot', 'Покупной черенок':'cutting', 'Покупные семена':'seed' };
-function expCatChange(){
-  const kind=EXP_MAT[document.getElementById('eCat').value];
-  document.getElementById('eMatBox').style.display = kind ? 'block' : 'none';
-  if(kind) document.getElementById('eMatUnit').textContent = MAT_UNIT(kind);
-}
-function openExp(){
-  document.getElementById('eSum').value=''; document.getElementById('eNote').value='';
-  document.getElementById('eMatName').value=''; document.getElementById('eMatQty').value='';
-  document.getElementById('eDate').value=new Date().toISOString().slice(0,10);
-  expCatChange();
-  document.getElementById('ovExp').classList.add('open');
-}
-async function saveExp(){
-  const cat=document.getElementById('eCat').value;
-  const sum=parseInt(document.getElementById('eSum').value)||0; if(sum<=0){alert('Укажите сумму');return;}
-  const date=document.getElementById('eDate').value;
-  const note=document.getElementById('eNote').value.trim();
-  try{
-    if(EXP_MAT[cat]){
-      const name=document.getElementById('eMatName').value.trim();
-      const qty=parseFloat(document.getElementById('eMatQty').value)||0;
-      if(!name){ alert('Введите название сырья'); return; }
-      if(qty<=0){ alert('Укажите количество'); return; }
-      await DB.purchaseMaterial({ name, kind:EXP_MAT[cat], qty, cost:sum, date, note });
-      setStatus('Закуп записан — сырьё на складе пополнено');
-    } else {
-      await DB.addExpense({ cat, sum, date, note });
-      setStatus('Расход записан');
-    }
-    closeOv('ovExp'); await reloadAll();
-  }catch(e){ setStatus('Ошибка: '+e.message, true); alert('Ошибка: '+e.message); }
-}
-
-function openImport(){ document.getElementById('impLog').textContent=''; document.getElementById('ovImp').classList.add('open'); }
-function runImport(){
-  const f=document.getElementById('impFile').files[0];
-  if(!f){alert('Выберите файл products.json');return;}
-  const log=document.getElementById('impLog');
-  const r=new FileReader();
-  r.onload=async function(e){
-    try{
-      const arr=JSON.parse(e.target.result);
-      if(!Array.isArray(arr))throw new Error('В файле должен быть список товаров');
-      log.textContent='Загружаю...';
-      await DB.importProducts(arr,(d,t)=>{log.textContent='Загружено '+d+' из '+t+'...'});
-      log.textContent='Готово! '+arr.length+' позиций в базе.';
-      setStatus('Товары загружены в базу');
-      setTimeout(()=>closeOv('ovImp'),1500);
-    }catch(err){ log.textContent='Ошибка: '+err.message; }
-  };
-  r.readAsText(f);
-}
-</script>
+<script src="admin.js"></script>
 </body>
 </html>

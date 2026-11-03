@@ -471,7 +471,7 @@ emailjs.init('CCkKkk4b4XNl04nfM');
 let currentGroup = 'all';
 let currentType = 'all';
 let selectedPlantId = null;
-let selectedSize = 'a1';
+let selectedSize = null;
 let selectedQty = 1;
 let cart = {};
 
@@ -558,9 +558,11 @@ function renderCatalog() {
   }
 
   grid.innerHTML = list.map(p => {
-    const minPrice = Math.min(...Object.values(p.price));
-    const stock = p.stock || { a1: 99, a2: 99, a3: 99 };
-    const soldOut = (stock.a1 <= 0 && stock.a2 <= 0 && stock.a3 <= 0);
+    const avail = availSizes(p);
+    const priced = sizesOf(p).map(z => (p.price || {})[z.k]).filter(v => v > 0);
+    const shown = avail.length ? avail.map(z => p.price[z.k]) : priced;
+    const minPrice = shown.length ? Math.min(...shown) : 0;
+    const soldOut = !avail.length;
     return `<div class="plant-card ${soldOut ? 'sold-out-card' : ''}" onclick="openModal(${p.id})">
       <div class="plant-img">
         <img src="${p.image_card}" alt="${p.name}" onerror="this.style.display='none'; this.parentElement.classList.add('no-img');">
@@ -577,33 +579,28 @@ function renderCatalog() {
   }).join('');
 }
 
+// Размеры, которые есть в наличии и имеют цену
+function availSizes(p) {
+  const st = p.stock || {}, pr = p.price || {};
+  return sizesOf(p).filter(z => (st[z.k] || 0) > 0 && (pr[z.k] || 0) > 0);
+}
+
 function openModal(plantId) {
   selectedPlantId = plantId;
-  selectedSize = 'a1';
   const plant = PLANTS.find(p => p.id === plantId);
-  const stock = plant.stock || { a1: 99, a2: 99, a3: 99 };
+  const stock = plant.stock || {};
   window.currentStock = stock;
-  const sizeInfo = {
-    a1: { name: 'Маленький (стаканчик)', price: plant.price.a1 },
-    a2: { name: 'Средний (3 литра)', price: plant.price.a2 },
-    a3: { name: 'Большой (кашпо)', price: plant.price.a3 }
-  };
-  
-  // Количество для каждого размера
-  window.modalQty = { a1: 0, a2: 0, a3: 0 };
+  const avail = availSizes(plant);
+  const sizeInfo = {};
+  avail.forEach(z => { sizeInfo[z.k] = { name: plant.cassette ? 'Рассада из кассеты (за 1 шт)' : 'Горшок ' + z.name, price: plant.price[z.k] }; });
+  window.modalQty = {};
+  avail.forEach(z => window.modalQty[z.k] = 0);
   window.currentSizeInfo = sizeInfo;
-  
+  selectedSize = avail.length ? avail[0].k : null;
+
   const html = `
     <div class="modal-gallery">
-      <div class="gallery-main"><img src="${plant.image_a1}" id="mainImage" alt="${plant.name}" onerror="this.style.display='none'; this.parentElement.classList.add('no-img');"></div>
-      <div class="size-tabs">
-        <button class="size-tab active" onclick="switchSize('a1')">Маленький</button>
-        <button class="size-tab" onclick="switchSize('a2')">Средний</button>
-        <button class="size-tab" onclick="switchSize('a3')">Большой</button>
-      </div>
-      <div style="font-size:.8rem; color:var(--muted); text-align:center; margin-top:.5rem;">
-        👆 Нажми на размер, чтобы посмотреть фото
-      </div>
+      <div class="gallery-main"><img src="${plant.image_card}" id="mainImage" alt="${plant.name}" onerror="this.style.display='none'; this.parentElement.classList.add('no-img');"></div>
     </div>
     <div class="modal-info">
       <h2>${plant.name}</h2>
@@ -611,22 +608,21 @@ function openModal(plantId) {
       <div class="size-selector">
         <span class="size-label">📏 Выберите размеры и количество</span>
         <div class="size-options">
-          ${['a1','a2','a3'].map(s => {
-            const out = stock[s] <= 0;
+          ${avail.length ? avail.map(z => {
+            const s = z.k;
             return `
-            <div class="size-row" style="display:flex; justify-content:space-between; align-items:center; padding:.9rem; background:var(--white); border-radius:3px; margin-bottom:.6rem; border:2px solid var(--border); ${out ? 'opacity:.55;' : ''}">
+            <div class="size-row" style="display:flex; justify-content:space-between; align-items:center; padding:.9rem; background:var(--white); border-radius:3px; margin-bottom:.6rem; border:2px solid var(--border);">
               <div style="flex:1;">
                 <div style="font-weight:700; font-size:.9rem;">${sizeInfo[s].name}</div>
                 <div style="color:var(--accent-red); font-weight:700; font-size:.95rem; font-family:'Montserrat';">${sizeInfo[s].price} ₸/шт</div>
-                ${out ? '<div style="color:var(--accent-red); font-size:.75rem; font-weight:700; margin-top:.2rem;">Нет в наличии</div>' : ''}
               </div>
               <div style="display:flex; align-items:center; gap:.5rem;">
-                <button class="qty-btn" style="width:34px; height:34px;" onclick="changeSizeQty('${s}', -1)" ${out?'disabled':''}>−</button>
+                <button class="qty-btn" style="width:34px; height:34px;" onclick="changeSizeQty('${s}', -1)">−</button>
                 <span id="qty_${s}" style="min-width:28px; text-align:center; font-weight:700; font-size:1.1rem;">0</span>
-                <button class="qty-btn" style="width:34px; height:34px;" onclick="changeSizeQty('${s}', 1)" ${out?'disabled':''}>+</button>
+                <button class="qty-btn" style="width:34px; height:34px;" onclick="changeSizeQty('${s}', 1)">+</button>
               </div>
             </div>
-          `; }).join('')}
+          `; }).join('') : '<div style="padding:1rem; color:var(--accent-red); font-weight:700;">Сейчас нет в наличии</div>'}
         </div>
       </div>
       <div style="background:var(--accent-red); color:#fff; padding:1.2rem; border-radius:3px; margin-bottom:1rem; text-align:center; font-weight:700; font-size:1.1rem;">
@@ -638,18 +634,6 @@ function openModal(plantId) {
   document.getElementById('modalContent').innerHTML = html;
   document.getElementById('overlay').classList.add('open');
   document.getElementById('plantModal').style.display = 'block';
-}
-
-function switchSize(size) {
-  selectedSize = size;
-  const plant = PLANTS.find(p => p.id === selectedPlantId);
-  const imgMap = {a1: plant.image_a1, a2: plant.image_a2, a3: plant.image_a3};
-  const mainImg = document.getElementById('mainImage');
-  const gallery = mainImg.parentElement;
-  gallery.classList.remove('no-img');
-  mainImg.style.display = 'block';
-  mainImg.src = imgMap[size];
-  document.querySelectorAll('.size-tab').forEach((btn, i) => btn.classList.toggle('active', ['a1','a2','a3'][i] === size));
 }
 
 function changeSizeQty(size, delta) {
@@ -666,7 +650,7 @@ function changeSizeQty(size, delta) {
 
 function updateModalTotal() {
   let total = 0;
-  ['a1','a2','a3'].forEach(s => {
+  Object.keys(window.modalQty).forEach(s => {
     total += (window.modalQty[s] || 0) * window.currentSizeInfo[s].price;
   });
   document.getElementById('modalTotal').textContent = total.toLocaleString('ru') + ' ₸';
@@ -675,7 +659,7 @@ function updateModalTotal() {
 function addToCart() {
   const plant = PLANTS.find(p => p.id === selectedPlantId);
   const qtys = window.modalQty;
-  const totalSelected = (qtys.a1 || 0) + (qtys.a2 || 0) + (qtys.a3 || 0);
+  const totalSelected = Object.values(qtys).reduce((n, v) => n + (v || 0), 0);
   
   if (totalSelected === 0) {
     showToast('Выберите количество хотя бы одного размера');
@@ -683,7 +667,7 @@ function addToCart() {
   }
   
   // Добавляем все размеры с количеством > 0
-  ['a1','a2','a3'].forEach(size => {
+  Object.keys(qtys).forEach(size => {
     if (qtys[size] > 0) {
       const key = `${selectedPlantId}-${size}`;
       cart[key] = (cart[key] || 0) + qtys[size];
@@ -733,8 +717,8 @@ function updateCartUI() {
     const qty = cart[k];
     const subtotal = price * qty;
     sum += subtotal;
-    const sizeLabels = {a1:'Маленький (стаканчик)', a2:'Средний (3 литра)', a3:'Большой (кашпо)'};
-    const sizeBadge = {a1:'#bbd004', a2:'#fb4e04', a3:'#8a6d2f'};
+    const sizeLabels = new Proxy({}, { get: (t, k) => SIZE(k).name });
+    const sizeBadge = new Proxy({}, { get: (t, k) => k === 'k' ? '#8a6d2f' : '#7a8a00' });
     return `<div class="cart-item">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem;">
         <div style="flex:1;">
@@ -778,7 +762,7 @@ function openCheckout() {
     const price = p.price[size];
     const subtotal = price * cart[k];
     sum += subtotal;
-    const sizeLabels = {a1:'Маленький', a2:'Средний', a3:'Большой'};
+    const sizeLabels = new Proxy({}, { get: (t, k) => SIZE(k).name });
     return `<div class="order-summary-row"><span>${p.name} (${sizeLabels[size]}) × ${cart[k]} шт</span><span>${subtotal.toLocaleString('ru')} ₸</span></div>`;
   }).join('');
   document.getElementById('modalBody').innerHTML = `<div class="section-title">Состав заказа</div><div class="order-summary">${orderRows}<div class="order-summary-row total"><span>ИТОГО:</span><span>${sum.toLocaleString('ru')} ₸</span></div></div><div class="section-title">Ваши данные</div><div class="form-row"><div class="form-group"><label>Имя *</label><input id="f_name" type="text" placeholder="Ваше имя"></div><div class="form-group"><label>Фамилия *</label><input id="f_surname" type="text" placeholder="Фамилия"></div></div><div class="form-row"><div class="form-group"><label>Телефон *</label><input id="f_phone" type="tel" placeholder="+7 (___) ___-__-__"></div><div class="form-group"><label>Email</label><input id="f_email" type="email" placeholder="email@example.com"></div></div><div class="form-group"><label>Адрес доставки *</label><input id="f_address" type="text" placeholder="Улица, дом, квартира"></div><div class="form-row"><div class="form-group"><label>Город</label><input id="f_city" type="text" placeholder="Алматы" value="Алматы"></div><div class="form-group"><label>Время доставки</label><select id="f_time"><option>Утро (9:00–12:00)</option><option>День (12:00–17:00)</option><option>Вечер (17:00–21:00)</option></select></div></div><div class="form-group"><label>Комментарий</label><textarea id="f_comment" placeholder="Пожелания..."></textarea></div><button class="submit-btn" onclick="submitOrder(${sum})">Отправить заказ →</button>`;
@@ -801,7 +785,7 @@ function submitOrder(totalPrice) {
   const time = document.getElementById('f_time').value;
   const comment = document.getElementById('f_comment').value.trim();
   const keys = Object.keys(cart).filter(k => cart[k] > 0);
-  const sizeLabels = {a1:'Маленький', a2:'Средний', a3:'Большой'};
+  const sizeLabels = new Proxy({}, { get: (t, k) => SIZE(k).name });
   const orderItems = keys.map(k => {
     const parts = k.split('-');
     const size = parts[parts.length - 1];
