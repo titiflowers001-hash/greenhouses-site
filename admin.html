@@ -292,7 +292,10 @@ function renderStock(){
   const units=PRODUCTS.reduce((n,p)=>{const s=p.stock||{};return n+(s.a1||0)+(s.a2||0)+(s.a3||0)},0);
 
   let list=PRODUCTS.filter(p=>grpFilter==='all'||p.group===grpFilter);
-  const q=(document.getElementById('sSearch')?document.getElementById('sSearch').value:'').toLowerCase();
+  const _sEl=document.getElementById('sSearch');
+  const q=(_sEl?_sEl.value:'').toLowerCase();
+  const _sFocused=(document.activeElement===_sEl && !!_sEl);
+  const _sCaret=_sFocused?_sEl.selectionStart:null;
   if(q) list=list.filter(p=>String(p.name).toLowerCase().includes(q));
 
   document.getElementById('pane-stock').innerHTML=
@@ -326,6 +329,10 @@ function renderStock(){
         '<button class="icon-btn" onclick="delProd('+p.id+')">x</button></div></td></tr>';
     }).join(''):'<tr><td colspan="7" class="empty">Пусто. Если база новая — нажми «Загрузить товары из JSON» вверху.</td></tr>')+
     '</tbody></table></div>';
+  if(_sFocused){
+    const el=document.getElementById('sSearch');
+    if(el){ el.focus(); try{ el.setSelectionRange(_sCaret, _sCaret); }catch(e){} }
+  }
 }
 async function chStock(id,k,v){ await DB.setStock(id,k,parseInt(v)||0); setStatus('Остаток обновлён — на сайте уже видно'); }
 async function chPrice(id,k,v){
