@@ -298,6 +298,20 @@ const DB = {
     });
   },
 
+  // ---------- ЗАГРУЗКА ПОЗИЦИЙ ИЗ JSON (без остатков) ----------
+  // Создаёт только новые карточки и новое сырьё, существующие не трогает.
+  async importPositions(newProducts, newMaterials, onProgress) {
+    const ops = [];
+    newProducts.forEach(p => ops.push(b => b.set(COL.products.doc(String(p.id)), p)));
+    newMaterials.forEach(m => ops.push(b => b.set(COL.materials.doc(), { ...m, stock: 0, avgCost: 0 })));
+    for (let i = 0; i < ops.length; i += 400) {
+      const batch = db.batch();
+      ops.slice(i, i + 400).forEach(f => f(batch));
+      await batch.commit();
+      if (onProgress) onProgress(Math.min(i + 400, ops.length), ops.length);
+    }
+  },
+
   // ---------- ОБНУЛЕНИЕ БАЗЫ ----------
   // Удаляет операции, продажи, клиентов, расходы, сырьё.
   // Карточки растений остаются, но их остатки, цены и себестоимость обнуляются.

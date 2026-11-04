@@ -32,7 +32,9 @@ const M = id => MATERIALS.find(m => m._docId === id);
 const num = v => { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; };
 const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ru');
 const pName = p => p ? p.name : '(удалён)';
-const matLabel = m => m ? m.name + (m.kind === 'pot' && m.size ? ' · ' + SIZE(m.size).name : '') : '(удалено)';
+const matLabel = m => m ? m.name + (m.kind === 'pot' && m.size ? ' · ' + SIZE(m.size).name : '') + (m.kind === 'cassette' && m.cells ? ' · ' + m.cells + ' яч.' : '') : '(удалено)';
+const isHumus = m => m && m.kind === 'soil' && /перегн/i.test(m.name || '');
+const MIX_DEFAULT = 30; // % перегноя в смеси при пересадке
 
 /* ================= ВХОД ================= */
 const AUTH = firebase.auth();
@@ -322,7 +324,9 @@ function renderOpBody(isNew){
     h += fld('Куда (карточка после пересадки)', pickHtml('opTo', f.to || from, p => !p.cassette, 'trToChanged()'));
     h += fld('Новый размер', sizeSel('opToSize', P(f.to || from), f.toSize, 'trToSizeChanged()'));
     h += '<div class="f2">' + fld('Земля', matSel('opSoil', ['soil'], f.soil, '— не списывать —', 'trCalc()')) +
-         fld('Горшок', matSel('opPot', ['pot'], f.pot, '— без горшка —', 'trCalc()')) + '</div>';
+         fld('Перегной', matSel('opHumus', ['soil'], f.humus, '— без перегноя —', 'trCalc()')) + '</div>';
+    h += '<div class="f2">' + fld('Перегноя в смеси, %', inp('opMix', f.mix != null ? f.mix : MIX_DEFAULT, 'type="number" min="0" max="100" oninput="trCalc()"')) +
+         fld('Горшок / стакан', matSel('opPot', ['pot'], f.pot, '— без горшка —', 'trCalc()')) + '</div>';
     h += '<div class="calc" id="opCalc"></div>';
     h += fld('Комментарий', inp('opNote', f.note || ''));
   }
@@ -369,20 +373,34 @@ function trToSizeChanged(){
   const ts = val('opToSize');
   const pot = MATERIALS.find(m => m.kind === 'pot' && m.size === ts);
   document.getElementById('opPot').value = pot ? pot._docId : '';
-  const soilEl = document.getElementById('opSoil');
-  if (!soilEl.value && soilEl.options.length > 1 && !OP.moveId) soilEl.selectedIndex = 1;
+  if (!OP.moveId) {
+    const soilEl = document.getElementById('opSoil'), humEl = document.getElementById('opHumus');
+    if (!soilEl.value) { const s0 = MATERIALS.find(m => m.kind === 'soil' && !isHumus(m)); if (s0) soilEl.value = s0._docId; }
+    if (!humEl.value) { const h0 = MATERIALS.find(isHumus); if (h0) humEl.value = h0._docId; }
+  }
   trCalc();
+}
+// Делит литры между землёй и перегноем по проценту
+function soilSplit(liters, soil, humus, mix){
+  mix = Math.min(100, Math.max(0, mix));
+  if (soil && humus && soil._docId === humus._docId) humus = null;
+  if (soil && humus) { const hl = rnd(liters * mix / 100); return { soilL: rnd(liters - hl), humL: hl }; }
+  if (soil) return { soilL: liters, humL: 0 };
+  if (humus) return { soilL: 0, humL: liters };
+  return { soilL: 0, humL: 0 };
 }
 function trCalc(){
   const qty = num(val('opQty')), fs = val('opFromSize'), ts = val('opToSize');
   const from = P(val('opFrom')), to = P(val('opTo'));
   const liters = rnd(Math.max(0, SIZE(ts).l - SIZE(fs).l) * qty);
-  const soil = M(val('opSoil')), pot = M(val('opPot'));
+  const soil = M(val('opSoil')), humus = M(val('opHumus')), pot = M(val('opPot'));
+  const sp = soilSplit(liters, soil, humus, num(val('opMix')));
   let h = '<b>Спишется:</b> ' + esc(pName(from)) + ' (' + SIZE(fs).name + ') −' + qty + ' шт';
-  if (soil && liters > 0) h += '; ' + esc(soil.name) + ' −' + liters + ' л';
+  if (sp.soilL > 0) h += '; ' + esc(soil.name) + ' −' + sp.soilL + ' л';
+  if (sp.humL > 0) h += '; ' + esc(humus.name) + ' −' + sp.humL + ' л';
   if (pot) h += '; ' + esc(matLabel(pot)) + ' −' + qty + ' шт';
   h += '<br><b>Придёт:</b> ' + esc(pName(to)) + ' (' + SIZE(ts).name + ') +' + qty + ' шт';
-  h += '<div class="hint">Земля = (' + SIZE(ts).l + ' − ' + SIZE(fs).l + ') л × ' + qty + ' шт = ' + liters + ' л</div>';
+  h += '<div class="hint">Грунт всего = (' + SIZE(ts).l + ' − ' + SIZE(fs).l + ') л × ' + qty + ' шт = ' + liters + ' л</div>';
   if (SIZE(ts).l <= SIZE(fs).l && fs !== 'k') h += '<div style="color:var(--red)">Новый размер не больше старого — проверь.</div>';
   if (!pot) h += '<div class="hint">Горшок не выбран — горшки не спишутся' + (MATERIALS.some(m => m.kind === 'pot') ? '' : ' (горшков в «Сырьё» нет)') + '.</div>';
   document.getElementById('opCalc').innerHTML = h;
@@ -444,7 +462,7 @@ function collectOp(){
   }
   if (t === 'transplant') {
     Object.assign(f, { from: val('opFrom'), fromSize: val('opFromSize'), to: val('opTo'), toSize: val('opToSize'),
-      qty: num(val('opQty')), soil: val('opSoil'), pot: val('opPot'), note: val('opNote').trim() });
+      qty: num(val('opQty')), soil: val('opSoil'), humus: val('opHumus'), mix: num(val('opMix')), pot: val('opPot'), note: val('opNote').trim() });
   }
   if (t === 'sale') {
     Object.assign(f, { lines: saleLines(), disc: num(val('opDisc')), discT: val('opDiscT') || 'tg', pay: val('opPay'),
@@ -480,15 +498,18 @@ function buildOp(t, f){
     need(!(String(from.id) === String(to.id) && f.fromSize === f.toSize), 'Размер «откуда» и «куда» совпадает');
     const liters = rnd(Math.max(0, SIZE(f.toSize).l - SIZE(f.fromSize).l) * f.qty);
     f.liters = liters;
-    const soil = M(f.soil), pot = M(f.pot);
+    const soil = M(f.soil), humus = M(f.humus), pot = M(f.pot);
+    const sp = soilSplit(liters, soil, humus, f.mix != null ? f.mix : MIX_DEFAULT);
     const effects = [
       { c:'p', id:String(from.id), size:f.fromSize, d:-f.qty },
       { c:'p', id:String(to.id),   size:f.toSize,   d: f.qty }
     ];
-    if (soil && liters > 0) effects.push({ c:'m', id:soil._docId, d:-liters });
+    if (sp.soilL > 0) effects.push({ c:'m', id:soil._docId, d:-sp.soilL });
+    if (sp.humL > 0) effects.push({ c:'m', id:humus._docId, d:-sp.humL });
     if (pot) effects.push({ c:'m', id:pot._docId, d:-f.qty });
     let summary = from.name + ' (' + SIZE(f.fromSize).name + ') → ' + (String(to.id) === String(from.id) ? '' : to.name + ' ') + '(' + SIZE(f.toSize).name + ') × ' + f.qty + ' шт';
-    if (soil && liters > 0) summary += '; земля ' + liters + ' л';
+    if (sp.soilL > 0) summary += '; земля ' + sp.soilL + ' л';
+    if (sp.humL > 0) summary += '; перегной ' + sp.humL + ' л';
     if (pot) summary += '; горшки ' + f.qty + ' шт';
     return { op: { type:t, form:f, effects, summary, note:f.note }, extra: {} };
   }
@@ -626,6 +647,7 @@ function matKindChange(){
   const k = val('matKind');
   document.getElementById('matUnitHint').textContent = 'Единица измерения: ' + MK(k).unit;
   document.getElementById('matSizeBox').style.display = k === 'pot' ? 'block' : 'none';
+  document.getElementById('matCellsBox').style.display = k === 'cassette' ? 'block' : 'none';
 }
 function openMat(docId){
   matEditId = docId || null;
@@ -634,6 +656,7 @@ function openMat(docId){
   document.getElementById('matName').value = m ? (m.name || '') : '';
   document.getElementById('matKind').innerHTML = MAT_KINDS.map(x => '<option value="' + x.k + '"' + (x.k === (m ? m.kind : 'soil') ? ' selected' : '') + '>' + x.name + ' (' + x.unit + ')</option>').join('');
   document.getElementById('matSize').innerHTML = SIZES.filter(s => s.k !== 'k').map(s => '<option value="' + s.k + '"' + (m && m.size === s.k ? ' selected' : '') + '>' + s.name + '</option>').join('');
+  document.getElementById('matCells').value = (m && m.cells) || '';
   matKindChange();
   document.getElementById('ovMat').classList.add('open');
 }
@@ -642,6 +665,7 @@ async function saveMat(){
   if (!name) { alert('Введите название'); return; }
   const data = { name, kind };
   if (kind === 'pot') data.size = val('matSize');
+  if (kind === 'cassette') { data.cells = Math.round(num(val('matCells'))); if (data.cells <= 0) { alert('Укажи количество ячеек'); return; } }
   if (matEditId) data._docId = matEditId;
   try{ await DB.saveMaterial(data); closeOv('ovMat'); setStatus('Сырьё сохранено'); }
   catch(e){ alert('Ошибка: ' + e.message); }
@@ -867,4 +891,77 @@ async function runReset(){
     await reloadAll(); setStatus('База обнулена');
     setTimeout(() => { closeOv('ovReset'); openImport(); }, 1200);
   }catch(e){ log.textContent = 'Ошибка: ' + e.message; }
+}
+
+/* ================= ЗАГРУЗКА ПОЗИЦИЙ ИЗ JSON ================= */
+// Формат: { products:[{name,group,type,desc,image}], materials:[{name,kind,size?,cells?}] }
+// Чистая функция: решает, что создать, а что уже есть. В базу не пишет.
+function planPositions(data, products, materials){
+  const errors = [], newP = [], newM = [], skipP = [], skipM = [];
+  if (!data || typeof data !== 'object') throw new Error('Файл не похож на файл позиций');
+  let nextId = products.length ? Math.max.apply(null, products.map(p => Number(p.id) || 0)) + 1 : 1;
+  const seenP = new Set(products.filter(p => !p.cassette).map(p => normName(p.name)));
+  (data.products || []).forEach((p, i) => {
+    const name = String(p.name || '').trim();
+    if (!name) { errors.push('Растение №' + (i + 1) + ': нет названия'); return; }
+    const key = normName(name);
+    if (seenP.has(key)) { skipP.push(name); return; }
+    seenP.add(key);
+    newP.push({ id: nextId++, name, desc: String(p.desc || ''), group: String(p.group || 'Без группы'), type: String(p.type || '-'),
+      vid: Array.isArray(p.vid) ? p.vid : [], image_card: p.image ? 'images/' + p.image + '_card.webp' : '',
+      cassette: false, active: true, stock: {}, price: {}, cost: {} });
+  });
+  const kinds = MAT_KINDS.map(k => k.k);
+  const seenM = new Set(materials.map(m => m.kind + '|' + normName(m.name)));
+  (data.materials || []).forEach((m, i) => {
+    const name = String(m.name || '').trim();
+    if (!name) { errors.push('Сырьё №' + (i + 1) + ': нет названия'); return; }
+    if (!kinds.includes(m.kind)) { errors.push('«' + name + '»: неизвестный вид «' + m.kind + '»'); return; }
+    if (m.kind === 'pot' && !SIZES.some(z => z.k === m.size && z.k !== 'k')) { errors.push('«' + name + '»: не указан размер горшка'); return; }
+    const key = m.kind + '|' + normName(name);
+    if (seenM.has(key)) { skipM.push(name); return; }
+    seenM.add(key);
+    const d = { name, kind: m.kind };
+    if (m.kind === 'pot') d.size = m.size;
+    if (m.kind === 'cassette' && m.cells) d.cells = Number(m.cells);
+    newM.push(d);
+  });
+  return { newP, newM, skipP, skipM, errors };
+}
+
+let JIMP = null;
+function openJson(){
+  JIMP = null; document.getElementById('jsonPreview').innerHTML = ''; document.getElementById('jsonGo').disabled = true;
+  document.getElementById('jsonFile').value = '';
+  document.getElementById('ovJson').classList.add('open');
+}
+function checkJson(){
+  const f = document.getElementById('jsonFile').files[0];
+  if (!f) { alert('Выбери файл .json'); return; }
+  const r = new FileReader();
+  r.onload = e => {
+    const pv = document.getElementById('jsonPreview');
+    try { JIMP = planPositions(JSON.parse(e.target.result), PRODUCTS, MATERIALS); }
+    catch (err) { pv.innerHTML = '<span style="color:var(--red)">Ошибка чтения файла: ' + esc(err.message) + '</span>'; return; }
+    const groups = {}; JIMP.newP.forEach(p => groups[p.group] = (groups[p.group] || 0) + 1);
+    pv.innerHTML =
+      '<div class="note">Будет создано: растений <b>' + JIMP.newP.length + '</b>' +
+        (JIMP.newP.length ? ' (' + Object.entries(groups).map(g => esc(g[0]) + ' — ' + g[1]).join(', ') + ')' : '') +
+        ', сырья <b>' + JIMP.newM.length + '</b>' + (JIMP.newM.length ? ': ' + JIMP.newM.map(m => esc(matLabel(m))).join(', ') : '') + '</div>' +
+      ((JIMP.skipP.length || JIMP.skipM.length) ? '<div class="f">Уже есть в базе, пропущу: растений ' + JIMP.skipP.length + ', сырья ' + JIMP.skipM.length +
+        (JIMP.skipM.length ? ' (' + JIMP.skipM.map(esc).join(', ') + ')' : '') + '</div>' : '') +
+      (JIMP.errors.length ? '<div class="f" style="color:var(--red)"><b>Ошибки — эти записи пропущу:</b><br>' + JIMP.errors.map(esc).join('<br>') + '</div>' : '<div class="money-pos">Ошибок нет</div>');
+    document.getElementById('jsonGo').disabled = !(JIMP.newP.length || JIMP.newM.length);
+  };
+  r.readAsText(f, 'utf-8');
+}
+async function runJson(){
+  if (!JIMP) return;
+  const btn = document.getElementById('jsonGo'); btn.disabled = true;
+  const pv = document.getElementById('jsonPreview');
+  try{
+    await DB.importPositions(JIMP.newP, JIMP.newM, (d, t) => { pv.innerHTML = 'Записываю ' + d + ' из ' + t + '...'; });
+    pv.innerHTML = '<div class="money-pos">Готово! Создано растений: ' + JIMP.newP.length + ', сырья: ' + JIMP.newM.length + '. Остатки — 0, цены заполни в карточках.</div>';
+    JIMP = null; setStatus('Позиции загружены');
+  }catch(e){ pv.innerHTML = '<span style="color:var(--red)">Ошибка: ' + esc(e.message) + '</span>'; btn.disabled = false; }
 }

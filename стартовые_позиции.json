@@ -1,0 +1,631 @@
+{
+ "format": "greenmama-positions-v1",
+ "products": [
+  {
+   "name": "альтернантера",
+   "group": "альтернантера",
+   "type": "purple prince",
+   "desc": "привет, я альтернантера и я не люблю жгучее солнце с 13:00 до 17:00. люблю когда поливают по мере просыхания и универсальный грунт. из витаминов больше ем кальций",
+   "image": "plant_1787485127725"
+  },
+  {
+   "name": "ЕС Персиковый авантюрин",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "драгоценное сияние летнего сада",
+   "image": "geran_peach_aventurin"
+  },
+  {
+   "name": "ИВ Майя Плисецкая",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "искры страстного па-де-де",
+   "image": "geran_maya_pliseckaya"
+  },
+  {
+   "name": "Ирида ЗА Роскошь",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "великолепие малинового бархата",
+   "image": "geran_irida_roskosh"
+  },
+  {
+   "name": "ИРИОЛ Алионора Аквитанская",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "воплощение королевской грации",
+   "image": "geran_alionora"
+  },
+  {
+   "name": "ИРИОЛ Сударыня Зоя",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "героиня старинного романа",
+   "image": "geran_sudarynya_zoya"
+  },
+  {
+   "name": "Леона Галактика",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "мерцающая вселенная оттенков",
+   "image": "geran_leona_galaktika"
+  },
+  {
+   "name": "ЛиА Жар-Птица",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "огненное танго света",
+   "image": "geran_zhar_ptica"
+  },
+  {
+   "name": "ЛиА Жозефина",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "элегантность и утончённость",
+   "image": "geran_zhozefina"
+  },
+  {
+   "name": "ЛиА Мильфей",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "цветочное угощение",
+   "image": "geran_milfey"
+  },
+  {
+   "name": "СиМ Диадема",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "королевская роскошь",
+   "image": "geran_diadema"
+  },
+  {
+   "name": "ТА Амазонка",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "энергия пламени",
+   "image": "geran_amazonka"
+  },
+  {
+   "name": "ТА Марсель",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "танец летнего рассвета",
+   "image": "geran_marsel"
+  },
+  {
+   "name": "ТА Эдер",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "ода чистоте",
+   "image": "geran_eder"
+  },
+  {
+   "name": "УГ Айгуль",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "хрупкая нежность",
+   "image": "geran_aigul"
+  },
+  {
+   "name": "Ю Анна Каренина",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "дыхание далёких времён",
+   "image": "geran_anna_karenina"
+  },
+  {
+   "name": "Ю Грушенька",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "аромат тайны",
+   "image": "geran_grushenka"
+  },
+  {
+   "name": "Ю Лариса Огудалова",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "мелодия красок и нежности",
+   "image": "geran_larisa_ogudalova"
+  },
+  {
+   "name": "Ю Марлезон 2",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "изысканный бал цветов",
+   "image": "geran_marlezon"
+  },
+  {
+   "name": "Ю Моя прелесть",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "ожерелье из розовых жемчужин",
+   "image": "geran_moya_prelest"
+  },
+  {
+   "name": "Ю Царская невеста",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "нежность с королевским достоинством",
+   "image": "geran_carskaya_nevesta"
+  },
+  {
+   "name": "ЮВ Даная",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "рассветное облако",
+   "image": "geran_danaya"
+  },
+  {
+   "name": "ЮВ Дейнерис",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "грация и загадочность",
+   "image": "geran_deyneris"
+  },
+  {
+   "name": "ЮВ Карфаген",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "легенда великого города",
+   "image": "geran_karfagen"
+  },
+  {
+   "name": "ЮВ Северная Андромеда",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "кружевное облако нежности",
+   "image": "geran_andromeda"
+  },
+  {
+   "name": "ЮВ Феникс",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "огненное возрождение",
+   "image": "geran_feniks"
+  },
+  {
+   "name": "ЮВ Эльбрус",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "вершина элегантности",
+   "image": "geran_elbrus"
+  },
+  {
+   "name": "Юзис Персей",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "цветочный Олимп",
+   "image": "geran_persey"
+  },
+  {
+   "name": "Black Country Bugle",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "эхо алых рассветов",
+   "image": "geran_bugle"
+  },
+  {
+   "name": "Cara Rosa",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "розовый шёлк",
+   "image": "geran_cara_rosa"
+  },
+  {
+   "name": "Eva Fly",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "танец нежности",
+   "image": "geran_eva_fly"
+  },
+  {
+   "name": "Fisher Appleblossom Rosebud",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "королевское очарование старины",
+   "image": "geran_fisher"
+  },
+  {
+   "name": "Hope J.P. I Bartlett",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "бархатный вихрь пурпурного сияния",
+   "image": "geran_hope"
+  },
+  {
+   "name": "Kvarnlyckans Anna-Jeanette",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "розовый шёпот тайн прошлого",
+   "image": "geran_anna_jeanette"
+  },
+  {
+   "name": "Lara Harmony",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "воздушная симфония",
+   "image": "geran_lara_harmony"
+  },
+  {
+   "name": "PAC Salmon Komtess",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "поэтическая утончённость",
+   "image": "geran_salmon_komtess"
+  },
+  {
+   "name": "PG Novis Hanna",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "последний луч заката",
+   "image": "geran_novis_hanna"
+  },
+  {
+   "name": "Rosebud Astrid",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "утренний румянец",
+   "image": "geran_rosebud_astrid"
+  },
+  {
+   "name": "Savannah TexMex Merlot Sizzle",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "мерцающее пламя в бокале мерло",
+   "image": "geran_merlot_sizzle"
+  },
+  {
+   "name": "Savannah TexMex Ruby",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "рубиновая страсть",
+   "image": "geran_texmex_ruby"
+  },
+  {
+   "name": "Survivor Pink Mega Splash",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "торжество нежности и страсти",
+   "image": "geran_pink_mega_splash"
+  },
+  {
+   "name": "Survivor Rosalinda",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "бесконечная симфония цветения",
+   "image": "geran_rosalinda"
+  },
+  {
+   "name": "Trendix Dark Red Impr.",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "игра света и тени",
+   "image": "geran_trendix_dark_red"
+  },
+  {
+   "name": "Trendix Neon Blue Impr.",
+   "group": "Герань (пеларгония)",
+   "type": "Герань",
+   "desc": "магия ночного неона",
+   "image": "geran_trendix_neon_blue"
+  },
+  {
+   "name": "Итальянка Анита F1",
+   "group": "Петуния",
+   "type": "Итальянка F1",
+   "desc": "выносливость и нежность в одном цветке",
+   "image": "petunia_anita"
+  },
+  {
+   "name": "Итальянка Виолетта F1",
+   "group": "Петуния",
+   "type": "Итальянка F1",
+   "desc": "чарующая магия южных сумерек",
+   "image": "petunia_violetta"
+  },
+  {
+   "name": "Итальянка Доротея F1",
+   "group": "Петуния",
+   "type": "Итальянка F1",
+   "desc": "танцующее пламя тосканского заката",
+   "image": "petunia_dorotea"
+  },
+  {
+   "name": "Итальянка Кларетта F1",
+   "group": "Петуния",
+   "type": "Итальянка F1",
+   "desc": "бархатное воплощение изящества",
+   "image": "petunia_claretta"
+  },
+  {
+   "name": "Итальянка Фульфия F1",
+   "group": "Петуния",
+   "type": "Итальянка F1",
+   "desc": "солнечное великолепие в каждом лепестке",
+   "image": "petunia_fulfia"
+  },
+  {
+   "name": "Итальянка Коломбина F1",
+   "group": "Петуния",
+   "type": "Итальянка F1",
+   "desc": "средиземноморская гладь на рассвете",
+   "image": "petunia_colombina"
+  },
+  {
+   "name": "Итальянка Розабелла F1",
+   "group": "Петуния",
+   "type": "Итальянка F1",
+   "desc": "лёгкий румянец на щеках летнего утра",
+   "image": "petunia_rozabella"
+  },
+  {
+   "name": "Опера F1 Blue",
+   "group": "Петуния",
+   "type": "Опера F1 (ампельная)",
+   "desc": "капли летнего дождя",
+   "image": "petunia_opera_blue"
+  },
+  {
+   "name": "Опера F1 Lemon",
+   "group": "Петуния",
+   "type": "Опера F1 (ампельная)",
+   "desc": "нежность солнечного света",
+   "image": "petunia_opera_lemon"
+  },
+  {
+   "name": "Опера F1 Lilac Ice",
+   "group": "Петуния",
+   "type": "Опера F1 (ампельная)",
+   "desc": "прохлада рассветного тумана",
+   "image": "petunia_opera_lilac_ice"
+  },
+  {
+   "name": "Опера F1 Pink",
+   "group": "Петуния",
+   "type": "Опера F1 (ампельная)",
+   "desc": "шёлковый рассвет",
+   "image": "petunia_opera_pink"
+  },
+  {
+   "name": "Опера F1 Purple",
+   "group": "Петуния",
+   "type": "Опера F1 (ампельная)",
+   "desc": "пурпурный танец в ритме ветра",
+   "image": "petunia_opera_purple"
+  },
+  {
+   "name": "Опера F1 Raspberry Ice",
+   "group": "Петуния",
+   "type": "Опера F1 (ампельная)",
+   "desc": "узоры летнего рассвета",
+   "image": "petunia_opera_raspberry_ice"
+  },
+  {
+   "name": "Опера F1 Red",
+   "group": "Петуния",
+   "type": "Опера F1 (ампельная)",
+   "desc": "каскад страсти",
+   "image": "petunia_opera_red"
+  },
+  {
+   "name": "Опера F1 Rose",
+   "group": "Петуния",
+   "type": "Опера F1 (ампельная)",
+   "desc": "малиновое сияние",
+   "image": "petunia_opera_rose"
+  },
+  {
+   "name": "Опера F1 White",
+   "group": "Петуния",
+   "type": "Опера F1 (ампельная)",
+   "desc": "водопад чистоты и света",
+   "image": "petunia_opera_white"
+  },
+  {
+   "name": "Amore Fiesta",
+   "group": "Петуния",
+   "type": "Amore",
+   "desc": "цветочная феерия",
+   "image": "petunia_amore_fiesta"
+  },
+  {
+   "name": "Amore Joy",
+   "group": "Петуния",
+   "type": "Amore",
+   "desc": "улыбка солнца",
+   "image": "petunia_amore_joy"
+  },
+  {
+   "name": "Amore Pink Hearts",
+   "group": "Петуния",
+   "type": "Amore",
+   "desc": "истинный шёпот любви",
+   "image": "petunia_amore_pink_hearts"
+  },
+  {
+   "name": "Amore Purple",
+   "group": "Петуния",
+   "type": "Amore",
+   "desc": "чарующее сияние любви",
+   "image": "petunia_amore_purple"
+  },
+  {
+   "name": "Amore Queen of Hearts",
+   "group": "Петуния",
+   "type": "Amore",
+   "desc": "способна покорить любое сердце",
+   "image": "petunia_amore_queen"
+  },
+  {
+   "name": "Capella Burgundy",
+   "group": "Петуния",
+   "type": "Capella",
+   "desc": "грация винного заката",
+   "image": "petunia_capella_burgundy"
+  },
+  {
+   "name": "Capella Coral",
+   "group": "Петуния",
+   "type": "Capella",
+   "desc": "летний фруктовый коктейль",
+   "image": "petunia_capella_coral"
+  },
+  {
+   "name": "Capella Hello Yellow",
+   "group": "Петуния",
+   "type": "Capella",
+   "desc": "танец солнечных зайчиков",
+   "image": "petunia_capella_hello_yellow"
+  },
+  {
+   "name": "Capella Mulberry",
+   "group": "Петуния",
+   "type": "Capella",
+   "desc": "бархатная летняя ночь",
+   "image": "petunia_capella_mulberry"
+  },
+  {
+   "name": "Capella White",
+   "group": "Петуния",
+   "type": "Capella",
+   "desc": "чистота и изящество",
+   "image": "petunia_capella_white"
+  },
+  {
+   "name": "Capella Ruby Red",
+   "group": "Петуния",
+   "type": "Capella",
+   "desc": "алый огонь цветущего лета",
+   "image": "petunia_capella_ruby_red"
+  },
+  {
+   "name": "Capella Sangria",
+   "group": "Петуния",
+   "type": "Capella",
+   "desc": "всплеск летнего настроения",
+   "image": "petunia_capella_sangria"
+  },
+  {
+   "name": "Cascadias Iceberg",
+   "group": "Петуния",
+   "type": "Cascadias (ампельная)",
+   "desc": "белоснежный водопад свежести",
+   "image": "petunia_cascadias_iceberg"
+  },
+  {
+   "name": "Cascadias Indian Summer",
+   "group": "Петуния",
+   "type": "Cascadias (ампельная)",
+   "desc": "вихрь осенних красок",
+   "image": "petunia_cascadias_indian"
+  },
+  {
+   "name": "Cascadias Lilac Crash",
+   "group": "Петуния",
+   "type": "Cascadias (ампельная)",
+   "desc": "водопад лиловых переливов",
+   "image": "petunia_cascadias_lilac_crash"
+  },
+  {
+   "name": "Littletunia Grace",
+   "group": "Петуния",
+   "type": "Littletunia",
+   "desc": "белоснежное облако нежности",
+   "image": "petunia_little_grace"
+  },
+  {
+   "name": "Littletunia Pink Splash",
+   "group": "Петуния",
+   "type": "Littletunia",
+   "desc": "романтичная безмятежность",
+   "image": "petunia_little_pink_splash"
+  },
+  {
+   "name": "Littletunia Rose",
+   "group": "Петуния",
+   "type": "Littletunia",
+   "desc": "рассветное небо над океаном",
+   "image": "petunia_little_rose"
+  },
+  {
+   "name": "Ray Shadow",
+   "group": "Петуния",
+   "type": "Ray",
+   "desc": "игра света и тени",
+   "image": "petunia_ray_shadow"
+  },
+  {
+   "name": "Ray Sunshine",
+   "group": "Петуния",
+   "type": "Ray",
+   "desc": "свет солнца в саду",
+   "image": "petunia_ray_sunshine"
+  },
+  {
+   "name": "Sel BabyDoll",
+   "group": "Петуния",
+   "type": "Sel",
+   "desc": "эмоции праздника",
+   "image": "petunia_sel_babydoll"
+  },
+  {
+   "name": "Sel NightSky",
+   "group": "Петуния",
+   "type": "Sel",
+   "desc": "магия ночного неба",
+   "image": "petunia_sel_nightsky"
+  },
+  {
+   "name": "Splash Dance Magenta",
+   "group": "Петуния",
+   "type": "Splash Dance",
+   "desc": "цветочное танго с солнечным светом",
+   "image": "petunia_splash_magenta"
+  }
+ ],
+ "materials": [
+  {
+   "name": "Грунт универсальный",
+   "kind": "soil"
+  },
+  {
+   "name": "Перегной",
+   "kind": "soil"
+  },
+  {
+   "name": "Стакан 0.2",
+   "kind": "pot",
+   "size": "s02"
+  },
+  {
+   "name": "Стакан 0.5",
+   "kind": "pot",
+   "size": "s05"
+  },
+  {
+   "name": "Горшок 1",
+   "kind": "pot",
+   "size": "s1"
+  },
+  {
+   "name": "Горшок 3",
+   "kind": "pot",
+   "size": "s3"
+  },
+  {
+   "name": "Горшок 5",
+   "kind": "pot",
+   "size": "s5"
+  },
+  {
+   "name": "Горшок 7",
+   "kind": "pot",
+   "size": "s7"
+  },
+  {
+   "name": "Горшок 10",
+   "kind": "pot",
+   "size": "s10"
+  }
+ ]
+}
